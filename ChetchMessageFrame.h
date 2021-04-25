@@ -1,7 +1,7 @@
 #ifndef CHETCH_MESSAGE_FRAME_H
 #define CHETCH_MESSAGE_FRAME_H
 
-#define MESSAGE_FRAME_ADD_TIMEOUT 1000
+#define MESSAGE_FRAME_ADD_TIMEOUT 10000
 
 namespace Chetch{
 
@@ -69,7 +69,9 @@ class MessageFrame{
     static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
     static int bytesToInt(byte *bytes, int offset, int numberOfBytes);
     static void longToBytes(byte *bytes, long n, int offset, int padToLength);
+    static void ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength);
     static void intToBytes(byte *bytes, int n, int offset, int padToLength);
+    static void floatToBytes(byte *bytes, float n, int offset);
     static bool isValidSchema(byte b);
     static bool isValidEncoding(byte b);
     static byte simpleChecksum(byte *bytes, int startIdx, int numberOfBytes);
@@ -94,6 +96,11 @@ class MessageFrame{
 
     void setEncoding(MessageEncoding encoding);
     void setPayload(byte *payload, int payloadSize);
+    void add2payload(byte val, int index);
+    void add2payload(long val, int index);
+    void add2payload(unsigned long val, int index);
+    void add2payload(int val, int index);
+    void add2payload(float val, int index);
     byte *getBytes(bool addChecksum = false);
     bool add(byte b);
     bool validate();

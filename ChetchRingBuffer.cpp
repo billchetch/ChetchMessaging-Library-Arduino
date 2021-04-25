@@ -2,13 +2,15 @@
 
 namespace Chetch{
 
+    RingBuffer::RingBuffer(){
+    }
+
     RingBuffer::RingBuffer(byte *buffer, int size){
       this->buffer = buffer;
       this->size = size;
       reset();
     }
 
-   
     void RingBuffer::reset(){
       readPosition = 0;
       writePosition = 0;
@@ -24,6 +26,17 @@ namespace Chetch{
         full = writePosition == readPosition;
         return true;
       }
+    }
+
+    bool RingBuffer::write(byte *bytes, int size){
+	if(remaining() < size){
+		return false;
+	} else {
+		for(int i = 0; i < size; i++){
+			if(!write(bytes[i]))return false;
+		}
+		return true;
+	}
     }
 
     byte RingBuffer::read(){

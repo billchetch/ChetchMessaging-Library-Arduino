@@ -23,8 +23,21 @@ namespace Chetch{
       }
     }
 
+    void MessageFrame::ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength){
+      for(int i = 0; i < padToLength; i++){
+        bytes[offset + i] = (byte)(n >> 8*i);
+      }
+    }
+
     void MessageFrame::intToBytes(byte *bytes, int n, int offset, int padToLength){
       longToBytes(bytes, (long)n, offset, padToLength);
+    }
+
+    void MessageFrame::floatToBytes(byte *bytes, float n, int offset){
+        byte* bytes2add = (byte*)&n;
+	for(int i = 0; i < sizeof(n); i++){
+	    bytes[offset + i] = bytes2add[i];
+	}
     }
 
     bool MessageFrame::isValidSchema(byte b){
@@ -83,6 +96,26 @@ namespace Chetch{
       for(int i = 0; i < payloadSize; i++){
         this->payload[i] = payload[i];
       }
+    }
+
+    void MessageFrame::add2payload(byte val, int index){
+	this->payload[index] = val;
+    }
+
+    void MessageFrame::add2payload(long val, int index){
+	longToBytes(this->payload, val, index, sizeof(val));
+    }
+
+    void MessageFrame::add2payload(int val, int index){
+	intToBytes(this->payload, val, index, sizeof(val));
+    }
+
+    void MessageFrame::add2payload(unsigned long val, int index){
+	ulongToBytes(this->payload, val, index, sizeof(val));
+    }
+
+    void MessageFrame::add2payload(float val, int index){
+	floatToBytes(this->payload, val, index);
     }
 
     byte *MessageFrame::getBytes(bool addChecksum){
@@ -190,22 +223,4 @@ namespace Chetch{
       dimensions->payload = 0;
     }
 
-
-    bool MessageFrame::write(Stream *stream){
-      if(dimensions == NULL){
-        error = FrameError::NO_DIMENSIONS;
-        return false;
-      }
-      if(dimensions->payload == 0){
-        error = FrameError::NO_PAYLOAD;
-        return false;
-      }
-
-      int n = dimensions->getSize();
-      if(n == 0)return false;
-
-      stream->write(bytes, n);
-
-      return true;
-    }
 } //end namespace
