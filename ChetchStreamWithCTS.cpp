@@ -20,55 +20,99 @@ namespace Chetch{
 
     void StreamWithCTS::begin(Stream *stream){
       this->stream = stream;
+      reset();
     }
 
+    void StreamWithCTS::reset(){
+      receiveBuffer.reset();
+      sendBuffer.reset();
+      bytesReceived = 0;
+      bytesSent = 0;
+      cts = true;
+    }
+
+
     byte StreamWithCTS::readFromStream(){
+	bytesReceived++;
 	return stream->read();
     }
 
     void StreamWithCTS::writeToStream(byte b){
+	bytesSent++;
 	stream->write(b);
     }
 
-    bool StreamWithCTS::streamIsAvailable(){
+    int StreamWithCTS::dataAvailable(){
 	return stream->available();
     }
 
-    bool StreamWithCTS::receive(){
-      bool sentCTS = false;
-      while(streamIsAvailable()){
-        byte b = readFromStream();
-	if(!cts && b == CTS_BYTE){
-          cts = true;
-          bytesSent = 0;
-        } else {
-	  bytesReceived++;
-          receiveBuffer.write(b);
-          if(bytesReceived >= uartBufferSize - 1){ //this is 1 less so we guaranteed to have space for sending a CTS_BYTE
-              writeToStream(CTS_BYTE);
-              bytesReceived = 0;
-              sentCTS = true;
-              break;
-          }
-        }
+    void StreamWithCTS::receive(){
+      while(dataAvailable() > 0){
+
+	byte b = readFromStream();
+	if(slashed){
+	  slashed = false;
+	} else {
+	  switch(b){
+	    case SLASH_BYTE:
+	      Serial.println(">>>>>> Received Slashed");
+	      slashed = true;
+	      continue;
+	   
+	    case CTS_BYTE:
+	      Serial.println(">>>>>> Received CTS ");
+	      cts = true;
+	      bytesSent = 0;
+	      continue;
+
+	    default:
+	      break;
+	  }
+	
+	}
+
+	if(receiveBuffer.isFull() && b != CTS_BYTE){
+	  Serial.print("ERROR: Oh no receive buffer full and non cts byte: "); Serial.println(b);
+	  error = 1;
+	  break;
+	}
+
+	receiveBuffer.write(b);
+	Serial.print("Received: "); Serial.println(b); 
+      } //end data available loop
+
+      if(bytesReceived >= uartBufferSize && receiveBuffer.remaining() >= uartBufferSize){
+	Serial.print(" / "); Serial.print(bytesReceived); Serial.print(" / "); Serial.println(receiveBuffer.remaining());
+      	writeToStream(CTS_BYTE);
+	bytesReceived = 0;
+	Serial.println("<<<<<<< Sending CTS");
       }
-      return sentCTS;
     }
 
-    bool StreamWithCTS::send(){
+    void StreamWithCTS::send(){
       while(!sendBuffer.isEmpty() && cts){
-        writeToStream(sendBuffer.read());
-        bytesSent++;
-        if(bytesSent >= uartBufferSize - 1){ //this is 1 less so we guaranteed to have space for sending a CTS_BYTE
+	byte b = sendBuffer.read();
+	switch(b){
+	  case CTS_BYTE:
+	  case SLASH_BYTE:
+   	    writeToStream(SLASH_BYTE);
+	    Serial.println("Adding slash byte");
+	    break;
+	}
+	Serial.print("Sent: "); Serial.println(b);
+	writeToStream(b);
+	if(bytesSent >= uartBufferSize){
           cts = false;
-          break;
         }
       }
-      return cts;
     }
 
-    bool StreamWithCTS::isEmpty(){
-      return receiveBuffer.isEmpty();
+    bool StreamWithCTS::canRead(){
+      return !receiveBuffer.isEmpty();
+    }
+
+    bool StreamWithCTS::canWrite(){
+	return !sendBuffer.isFull();
     }
 
     byte StreamWithCTS::read(){
@@ -83,4 +127,7 @@ namespace Chetch{
       return sendBuffer.write(bytes, size);
     }
 
+    bool StreamWithCTS::isClearToSend(){
+      return cts;
+    }
 } //end namespace

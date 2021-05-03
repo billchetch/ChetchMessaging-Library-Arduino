@@ -85,14 +85,24 @@ namespace Chetch{
       header[1] = (byte)encoding;
     }
 
+    MessageFrame::MessageEncoding MessageFrame::getEncoding(){
+      return this->encoding;
+    }
+
+    void MessageFrame::updatePayload(int payloadSize){
+	if(payloadSize > dimensions->payload){
+	    dimensions->payload = payloadSize;
+      	    intToBytes(bytes, dimensions->payload, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
+	}
+    }
+
     void MessageFrame::setPayload(byte *payload, int payloadSize){
       if(dimensions == NULL || bytes == NULL){
         return;
       }
 
-      dimensions->payload = payloadSize;
-      intToBytes(bytes, payloadSize, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
-
+      updatePayload(payloadSize);
+      
       for(int i = 0; i < payloadSize; i++){
         this->payload[i] = payload[i];
       }
@@ -100,22 +110,27 @@ namespace Chetch{
 
     void MessageFrame::add2payload(byte val, int index){
 	this->payload[index] = val;
+	updatePayload(index + sizeof(val));
     }
 
     void MessageFrame::add2payload(long val, int index){
 	longToBytes(this->payload, val, index, sizeof(val));
+	updatePayload(index + sizeof(val));
     }
 
     void MessageFrame::add2payload(int val, int index){
 	intToBytes(this->payload, val, index, sizeof(val));
+	updatePayload(index + sizeof(val));
     }
 
     void MessageFrame::add2payload(unsigned long val, int index){
 	ulongToBytes(this->payload, val, index, sizeof(val));
+	updatePayload(index + sizeof(val));
     }
 
     void MessageFrame::add2payload(float val, int index){
 	floatToBytes(this->payload, val, index);
+	updatePayload(index + sizeof(val));
     }
 
     byte *MessageFrame::getBytes(bool addChecksum){
@@ -138,7 +153,7 @@ namespace Chetch{
          return true;
       }
 
-      if(position == 0){
+      if(addPosition == 0){
         startedAdding = millis();
 
         //Check the first byte is valid as this determines the dimensions of frame we are dealing with
@@ -148,7 +163,7 @@ namespace Chetch{
           return true;
         }
 
-      } else if(position == dimensions->getPayloadIndex()){
+      } else if(addPosition == dimensions->getPayloadIndex()){
         //here we have the header so make some assignments
         encoding = (MessageFrame::MessageEncoding)header[dimensions->getEncodingIndex()];
 
@@ -161,10 +176,10 @@ namespace Chetch{
         }
       }
 
-      bytes[position] = b;
-      position++;
+      bytes[addPosition] = b;
+      addPosition++;
 
-      if(dimensions->payload > 0 && position == dimensions->getSize()){
+      if(dimensions->payload > 0 && addPosition == dimensions->getSize()){
         complete = true;
       }
 
@@ -217,7 +232,7 @@ namespace Chetch{
 
     void MessageFrame::reset(){
       startedAdding = -1;
-      position = 0;
+      addPosition = 0;
       complete = false;
       error = FrameError::NO_ERROR;
       dimensions->payload = 0;

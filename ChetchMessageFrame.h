@@ -1,11 +1,13 @@
 #ifndef CHETCH_MESSAGE_FRAME_H
 #define CHETCH_MESSAGE_FRAME_H
 
-#define MESSAGE_FRAME_ADD_TIMEOUT 10000
+#define MESSAGE_FRAME_ADD_TIMEOUT 100000
 
 namespace Chetch{
 
 class MessageFrame{
+  private:
+	void updatePayload(int payloadSize);
 
   public:
       enum FrameSchema{
@@ -85,7 +87,7 @@ class MessageFrame{
     byte *bytes = NULL; //will point to header or payload or checkum
 
     long startedAdding = -1; //time in millis where we started addinig bytes
-    int position = 0;
+    int addPosition = 0;
     bool complete = false;
 
     FrameError error = FrameError::NO_ERROR;
@@ -95,6 +97,7 @@ class MessageFrame{
     ~MessageFrame();
 
     void setEncoding(MessageEncoding encoding);
+    MessageEncoding getEncoding();
     void setPayload(byte *payload, int payloadSize);
     void add2payload(byte val, int index);
     void add2payload(long val, int index);
