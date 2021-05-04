@@ -72,5 +72,7 @@ namespace Chetch{
       return size - used(); 
     }
 
-
+    int RingBuffer::getSize(){
+	return size;
+    }
 } //end namespace

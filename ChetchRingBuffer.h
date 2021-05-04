@@ -24,6 +24,7 @@ class RingBuffer{
     bool isEmpty();
     int used();
     int remaining();
+    int getSize();
 };
 } //end namespace
 #endif

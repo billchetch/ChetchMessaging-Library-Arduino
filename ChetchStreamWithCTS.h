@@ -11,10 +11,9 @@ class StreamWithCTS{
 
   protected:
     Stream *stream;
-    byte *_rbuffer = NULL;
-    byte *_sbuffer = NULL;
-    RingBuffer sendBuffer;
-    int uartBufferSize = 0;
+    byte *rbuffer = NULL;
+    byte *sbuffer = NULL;
+    unsigned int uartBufferSize = 0;
     bool cts = false;
     bool slashed = false;
     unsigned long bytesSent = 0;
@@ -30,11 +29,13 @@ class StreamWithCTS{
     static const byte CTS_BYTE = (byte)0x62;
     static const byte SLASH_BYTE = (byte)0x5c;
 
+	RingBuffer sendBuffer;
+
 	RingBuffer receiveBuffer;
 	int error = 0;
     
    
-    StreamWithCTS(int receiveBufferSize, int sendBufferSize, int uartBufferSize);
+    StreamWithCTS(unsigned int uartBufferSize, unsigned int receiveBufferSize = 0, unsigned int sendBufferSize = 0);
     ~StreamWithCTS();
 
     void begin(Stream *stream);
@@ -47,6 +48,8 @@ class StreamWithCTS{
     bool write(byte *bytes, int size);
     bool isClearToSend();
     void reset();
+    unsigned int getUartBufferSize();
+    void printVitals();
 };
 
 }

@@ -2,20 +2,30 @@
 
 namespace Chetch{
 
-    StreamWithCTS::StreamWithCTS(int receiveBufferSize, int sendBufferSize, int uartBufferSize){
-      _rbuffer = new byte[receiveBufferSize];
-      _sbuffer = new byte[sendBufferSize];
-
-      receiveBuffer = RingBuffer(_rbuffer, receiveBufferSize);
-      sendBuffer = RingBuffer(_sbuffer, sendBufferSize);
+    StreamWithCTS::StreamWithCTS(unsigned int uartBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize){
 
       this->uartBufferSize = uartBufferSize;
+
+      if(receiveBufferSize == 0) receiveBufferSize = 2*receiveBufferSize;
+      if(sendBufferSize == 0) sendBufferSize = 2*uartBufferSize;
+
+      rbuffer = new byte[receiveBufferSize];
+      sbuffer = new byte[sendBufferSize];
+
+      receiveBuffer = RingBuffer(rbuffer, receiveBufferSize);
+      sendBuffer = RingBuffer(sbuffer, sendBufferSize);
+
+      
       cts = true;
     }
 
     StreamWithCTS::~StreamWithCTS(){
-      if(_rbuffer != NULL)delete[] _rbuffer;
-      if(_sbuffer != NULL)delete[] _sbuffer;
+      if(rbuffer != NULL)delete[] rbuffer;
+      if(sbuffer != NULL)delete[] sbuffer;
+    }
+
+    unsigned int StreamWithCTS::getUartBufferSize(){ 
+      return uartBufferSize; 
     }
 
     void StreamWithCTS::begin(Stream *stream){
@@ -46,6 +56,23 @@ namespace Chetch{
 	return stream->available();
     }
 
+
+    void StreamWithCTS::printVitals(){
+	Serial.print(" .... ");
+	Serial.print("BR: "); 
+	Serial.print(bytesReceived); 
+	Serial.print(", ");
+	Serial.print("RBR: ");
+	Serial.print(receiveBuffer.remaining());
+	Serial.print(", ");
+	Serial.print("BS: "); 
+	Serial.print(bytesSent); 
+	Serial.print(", ");
+	Serial.print("SBR: ");
+	Serial.print(sendBuffer.remaining());
+	Serial.println("");
+	
+    }
     void StreamWithCTS::receive(){
       while(dataAvailable() > 0){
 
@@ -55,12 +82,12 @@ namespace Chetch{
 	} else {
 	  switch(b){
 	    case SLASH_BYTE:
-	      Serial.println(">>>>>> Received Slashed");
+	      Serial.print(">>>>>> Received Slashed"); printVitals();
 	      slashed = true;
 	      continue;
 	   
 	    case CTS_BYTE:
-	      Serial.println(">>>>>> Received CTS ");
+	      Serial.print(">>>>>> Received CTS "); printVitals();
 	      cts = true;
 	      bytesSent = 0;
 	      continue;
@@ -71,21 +98,21 @@ namespace Chetch{
 	
 	}
 
-	if(receiveBuffer.isFull() && b != CTS_BYTE){
+	if(receiveBuffer.isFull()){
 	  Serial.print("ERROR: Oh no receive buffer full and non cts byte: "); Serial.println(b);
 	  error = 1;
 	  break;
 	}
 
 	receiveBuffer.write(b);
-	Serial.print("Received: "); Serial.println(b); 
+	Serial.print("Received: "); Serial.print(b); printVitals();
       } //end data available loop
 
       if(bytesReceived >= uartBufferSize && receiveBuffer.remaining() >= uartBufferSize){
-	Serial.print(" / "); Serial.print(bytesReceived); Serial.print(" / "); Serial.println(receiveBuffer.remaining());
-      	writeToStream(CTS_BYTE);
+	writeToStream(CTS_BYTE);
+	Serial.print("<<<<<<< Sending CTS");
+	printVitals();
 	bytesReceived = 0;
-	Serial.println("<<<<<<< Sending CTS");
       }
     }
 
@@ -99,9 +126,10 @@ namespace Chetch{
 	    Serial.println("Adding slash byte");
 	    break;
 	}
-	Serial.print("Sent: "); Serial.println(b);
+	Serial.print("Sent: "); Serial.print(b); printVitals();
 	writeToStream(b);
 	if(bytesSent >= uartBufferSize){
+	  Serial.println("Setting CTS to false...");
           cts = false;
         }
       }
