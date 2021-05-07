@@ -21,7 +21,7 @@ class StreamWithCTS{
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
     virtual byte readFromStream();
-    virtual void writeToStream(byte b);
+    virtual void writeToStream(byte b, bool flush = false);
     virtual int dataAvailable();  
     
 
