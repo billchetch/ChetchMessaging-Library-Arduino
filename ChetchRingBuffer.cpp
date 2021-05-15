@@ -3,12 +3,25 @@
 namespace Chetch{
 
     RingBuffer::RingBuffer(){
+       deleteBuffer = false;
+    }
+
+    RingBuffer::RingBuffer(int size){
+      this->buffer = new byte[size];
+      deleteBuffer = true;
+      this->size = size;
+      reset();
     }
 
     RingBuffer::RingBuffer(byte *buffer, int size){
       this->buffer = buffer;
+      deleteBuffer = false;
       this->size = size;
       reset();
+    }
+
+    RingBuffer::~RingBuffer(){
+      if(deleteBuffer && buffer != NULL)delete[] buffer;
     }
 
     void RingBuffer::reset(){
@@ -46,6 +59,10 @@ namespace Chetch{
       }
       full = false;
       return b;
+    }
+
+    byte RingBuffer::peek(){
+        return buffer[readPosition];
     }
 
     bool RingBuffer::isFull(){
