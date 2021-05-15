@@ -24,7 +24,7 @@ namespace Chetch{
     StreamWithCTS::~StreamWithCTS(){
       if(receiveBuffer != NULL)delete receiveBuffer;
       if(sendBuffer != NULL)delete sendBuffer;
-      //if(dataBuffer != NULL)delete dataBuffer;  
+      if(dataBuffer != NULL)delete dataBuffer;  
     }
 
     unsigned int StreamWithCTS::getUartBufferSize(){ 
@@ -40,7 +40,7 @@ namespace Chetch{
     void StreamWithCTS::reset(){
       receiveBuffer->reset();
       sendBuffer->reset();
-      //if(dataBuffer != NULL)dataBuffer->reset();
+      if(dataBuffer != NULL)dataBuffer->reset();
       bytesReceived = 0;
       bytesSent = 0;
       cts = true;
@@ -48,12 +48,12 @@ namespace Chetch{
     }
 
 
-    /*bool StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, RingBuffer*, bool), int size){
+    bool StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, RingBuffer*, bool), int size){
       if(dataHandler != NULL)return false;
 
       dataHandler = handler;
       dataBuffer = new RingBuffer(size);
-    }*/
+    }
 
     byte StreamWithCTS::readFromStream(){
 	return stream->read();
@@ -106,16 +106,17 @@ namespace Chetch{
 
 	  case END_BYTE:
 	    isData = false;
-	    readFromStream(); //remove byte from stream
-	      /*if(dataBuffer != NULL){
-	  	while(!receiveBuffer->isEmpty()){
-	    	  dataBuffer->write(receiveBuffer->read());
-	      	}
-	      	if(dataHandler != NULL){
-		  //Serial.println("END BYTE");
-		  dataHandler(this, dataBuffer, true);
-		}
-	      }*/
+	    b = readFromStream(); //remove byte from stream
+	    if(dataBuffer != NULL){
+	      while(!receiveBuffer->isEmpty()){
+	    	dataBuffer->write(receiveBuffer->read());
+	      }
+	      if(dataHandler != NULL){
+		//Serial.println("END BYTE");
+		dataHandler(this, dataBuffer, true);
+		dataBuffer->reset();
+	      }
+	    }
 	    break; //allow break so we count this
 
    	  case ERROR_BYTE:
@@ -161,10 +162,14 @@ namespace Chetch{
 	  //Serial.print("<<<<<<< Sending CTS"); printVitals();
 	  bytesReceived = 0;
 	}
+
+	if(b == END_BYTE){
+	  break;
+	}
       } //end data available loop      
     }
 
-    /*void StreamWithCTS::process(){
+    void StreamWithCTS::process(){
 	if(dataBuffer != NULL){
 	  bool dataReceived = false;
 	    
@@ -178,7 +183,7 @@ namespace Chetch{
 	    dataHandler(this, dataBuffer, false);	
 	  }
 	}
-    }*/
+    }
 
     void StreamWithCTS::send(){
       byte b;
