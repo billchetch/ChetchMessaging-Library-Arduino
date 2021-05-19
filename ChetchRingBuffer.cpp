@@ -24,6 +24,13 @@ namespace Chetch{
       if(deleteBuffer && buffer != NULL)delete[] buffer;
     }
 
+    void RingBuffer::setBuffer(byte *buf, int size){
+      if(deleteBuffer && buffer != NULL)delete[] buffer;
+      buffer = buf;
+      deleteBuffer = false;
+      this->size = size;
+    }
+
     void RingBuffer::reset(){
       readPosition = 0;
       writePosition = 0;

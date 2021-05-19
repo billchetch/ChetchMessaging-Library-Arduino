@@ -19,6 +19,7 @@ class RingBuffer{
     RingBuffer(byte *buffer, int size);
     ~RingBuffer();
 
+    void setBuffer(byte *buf, int size);
     void reset();
     bool write(byte b);
     bool write(byte *bytes, int size);

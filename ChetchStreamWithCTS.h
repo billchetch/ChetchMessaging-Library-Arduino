@@ -9,15 +9,17 @@ namespace Chetch{
 
 class StreamWithCTS{
 
-  protected:
+  public:
     Stream *stream;
     unsigned int uartBufferSize = 0;
-    RingBuffer *sendBuffer;
-    RingBuffer *receiveBuffer;
-    RingBuffer *dataBuffer;
+    RingBuffer *sendBuffer = NULL;
+    RingBuffer *receiveBuffer = NULL;
+    RingBuffer *dataBuffer = NULL;
     bool cts = false;
     unsigned long bytesSent = 0;
     unsigned long bytesReceived = 0;
+    bool rslashed = false;
+    int endOfDataCount = 0;
     
     //command byte callback
     void (*commandCallback)(StreamWithCTS*, byte);
@@ -25,8 +27,8 @@ class StreamWithCTS{
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
-    virtual byte readFromStream();
-    virtual void writeToStream(byte b, bool flush = false);
+    virtual byte readFromStream(bool count = true);
+    virtual void writeToStream(byte b, bool count = true, bool flush = false);
     virtual byte peekAtStream();
     virtual int dataAvailable();  
     
