@@ -19,7 +19,15 @@ class StreamWithCTS{
     unsigned long bytesSent = 0;
     unsigned long bytesReceived = 0;
     bool rslashed = false;
+    bool sslashed = false;
+    
+    byte readHistory[64];
+    int readHistoryIndex = 0;
     int endOfDataCount = 0;
+    byte lastPeekedByte = 0;
+    byte lastReadByte = 0;
+    byte lastReceivedByte = 0;
+    byte ctsCount = 0;
     
     //command byte callback
     void (*commandCallback)(StreamWithCTS*, byte);
@@ -34,9 +42,11 @@ class StreamWithCTS{
     
 
   public:
-    static const byte ERROR_BYTE = (byte)0x21;
-    static const byte CTS_BYTE = (byte)0x62;
+    static const byte ERROR_BYTE = (byte)0x65;
+    static const byte CTS_BYTE = (byte)0x74;
+    static const byte PING_BYTE = (byte)0x62;
     static const byte SLASH_BYTE = (byte)0x5c;
+    static const byte PAD_BYTE = (byte)0x70;
     static const byte RESET_BYTE = (byte)0x63;
     static const byte END_BYTE = (byte)0x64;
 
@@ -53,6 +63,7 @@ class StreamWithCTS{
     void send();
     bool canRead();
     bool canWrite();
+    bool requiresCTS(unsigned long byteCount);
     byte read();
     bool write(byte b);
     bool write(byte *bytes, int size);
@@ -60,6 +71,7 @@ class StreamWithCTS{
     void reset();
     unsigned int getUartBufferSize();
     void printVitals();    
+    void dumpLog();
 };
 
 }

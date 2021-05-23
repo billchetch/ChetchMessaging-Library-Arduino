@@ -41,7 +41,16 @@ namespace Chetch{
       cts = true;
       error = 0;
       rslashed = false;
+      
+      //temp
+      ctsCount = 0;
       endOfDataCount = 0;
+      lastPeekedByte = 0;
+      lastReadByte = 0;
+      lastReceivedByte = 0;
+      for(int i = 0; i < 64; i++){
+	readHistory[i] = 0;
+      }
     }
 
 
@@ -54,7 +63,10 @@ namespace Chetch{
 
     byte StreamWithCTS::readFromStream(bool count){
 	if(count)bytesReceived++;
-	return stream->read();
+	byte b = stream->read();
+	readHistory[readHistoryIndex] = b;
+	readHistoryIndex = (readHistoryIndex + 1) % 64;
+	return b;
     }
 
     void StreamWithCTS::writeToStream(byte b, bool count, bool flush){
@@ -91,13 +103,33 @@ namespace Chetch{
 	Serial.println("");
 	
     }
+
+    void StreamWithCTS::dumpLog(){
+	Serial.write(ctsCount);
+	Serial.write((byte)bytesReceived);
+	for(int i = 0; i < 64; i++){
+		int idx = (readHistoryIndex + i) % 64;
+		Serial.write(readHistory[idx]);
+	}
+    }
     void StreamWithCTS::receive(){
       bool isData = true;
       bool continueReceiving = true;
       byte b;
       while(dataAvailable() > 0 && continueReceiving){
 	b = peekAtStream(); //we peek in case this is a data byte but the receive buffer is full
+	byte k = lastPeekedByte;
+	lastPeekedByte = b;
 	if(rslashed){
+	  //Serial.write(130);
+	  /*if(b == CTS_BYTE){
+	      Serial.write(ERROR_BYTE);
+	      Serial.write(251);
+	      Serial.write(k);
+      	      Serial.write(b);
+      	      dumpLog();
+	      Serial.write(252);
+	  }*/
 	  isData = true;
 	} else {
 	//Serial.print("Peaking at: "); Serial.write(b); Serial.println("");
@@ -110,6 +142,7 @@ namespace Chetch{
 	      return; //cos this is a reset
 
 	    case END_BYTE:
+		Serial.write(247);
 	      //Serial.println("End byte received");
 	      b = readFromStream(); //remove from buffer
 	      isData = false;
@@ -137,6 +170,10 @@ namespace Chetch{
 
    	    case ERROR_BYTE:
 	      b = readFromStream(); //remove from uart buffer
+	      Serial.write(ERROR_BYTE);
+	      Serial.write(248);
+	      dumpLog();
+	      Serial.write(248);
 	      if(commandCallback != NULL)commandCallback(this, b); //TODO: maybe make this return a bool for continueReceiving flag
 	      isData = false;
 	      break; //allow break so we count this
@@ -144,13 +181,33 @@ namespace Chetch{
   	    case SLASH_BYTE:
 	      //Serial.print(">>>>>> Received Slashed"); printVitals();
 	      b = readFromStream(); //remove from uart buffer
+	      lastReadByte = b;
 	      isData = false;
 	      rslashed = true;
+	      //Serial.write(131);
 	      break;
-	   
+
+	    case PAD_BYTE:
+	      b = readFromStream(); //remove from buffer (and therfore count)
+	      lastReadByte = b;
+	      isData = false; //so we jus discard this byte afer counting
+	      break;
+
+	    case PING_BYTE:
+	      Serial.write(ERROR_BYTE);
+	      Serial.write(249);
+	      b = readFromStream(); //remove from uart buffer
+	      lastReadByte = b;
+	      isData = false;
+	      dumpLog();
+	      Serial.write(249);
+	      break;
+
 	    case CTS_BYTE:
 	      //Serial.print(">>>>>> Received CTS "); printVitals();
+	      //Serial.write(132);
 	      b = readFromStream(false); //remove from uart buffer
+	      lastReadByte = b;
 	      cts = true;
 	      bytesSent = 0;
      	      continueReceiving = false; //we exit the loop so as we can dispatch anything in the send buffer
@@ -170,16 +227,25 @@ namespace Chetch{
 	    continueReceiving = false;
 	  } else {
 	    b = readFromStream();
+	    if(lastReceivedByte > 0 && abs(b - lastReceivedByte) != 1){
+		Serial.write(ERROR_BYTE);
+		Serial.write(243);
+		dumpLog();
+	    }
+	    lastReadByte = b;
 	    if(rslashed)rslashed = false;
 	    //Serial.print("Adding: "); Serial.write(b); Serial.println(" to RB");
+	    lastReceivedByte = b;
   	    receiveBuffer->write(b);
+	    //Serial.write(133);
 	  }
 	}
 	
 	//Serial.print("Received: "); Serial.print(b); printVitals();
 
-	if(bytesReceived >= (uartBufferSize - 2)){
+	if(requiresCTS(bytesReceived)){
 	  writeToStream(CTS_BYTE, false, true);
+	  ctsCount++;
 	  //Serial.print("<<<<<<< Sending CTS"); printVitals();
 	  bytesReceived = 0;
 	}
@@ -188,12 +254,11 @@ namespace Chetch{
 
     void StreamWithCTS::process(){
 	if(dataBuffer != NULL){
-	  bool dataReceived = false;
+	  bool dataReceived = canRead() && !dataBuffer->isFull();
 	    
-	  while(!receiveBuffer->isEmpty() && !dataBuffer->isFull()){
+	  while(canRead() && !dataBuffer->isFull()){
 	    byte b = read();
 	    dataBuffer->write(b);
-	    dataReceived = true;
 	  }
 
 	  if(dataHandler != NULL && dataReceived){
@@ -205,24 +270,51 @@ namespace Chetch{
     void StreamWithCTS::send(){
       byte b;
       while(!sendBuffer->isEmpty() && cts){
-	b = sendBuffer->read();
-	switch(b){
-	  case CTS_BYTE:
-	  case SLASH_BYTE:
-	  case END_BYTE:
-	  case RESET_BYTE:
-	  case ERROR_BYTE:
-	    writeToStream(SLASH_BYTE);
-	    break;
-
-	  default:
-	    break;
+	b = sendBuffer->peek();
+	if(sslashed){
+	  sslashed = false;
+	  b = sendBuffer->read();
+	} else {
+	  switch(b){
+	    case CTS_BYTE:
+	    case SLASH_BYTE:
+	    case PAD_BYTE:
+	    case END_BYTE:
+	    case RESET_BYTE:
+	    case ERROR_BYTE:
+	    case PING_BYTE:
+	      if(requiresCTS(bytesSent + 1)){
+		//Serial.println("Use pad byte");
+		b = PAD_BYTE;
+	      } else {
+	        b = SLASH_BYTE;
+		//Serial.println("Use slash");
+	        sslashed = true;
+	      }
+  	      break;
+  
+	    default:
+	      b = sendBuffer->read();
+	      //Serial.print("Normal byte: "); Serial.write(b); Serial.println("");
+	      break;
+	  }
 	}
+
 	writeToStream(b);
-        if(bytesSent >= (uartBufferSize - 2)){
+	if(requiresCTS(bytesSent)){
 	  cts = false;
 	}
       }
+    }
+
+    bool StreamWithCTS::requiresCTS(unsigned long byteCount){
+	if(byteCount > (uartBufferSize - 2)){
+		Serial.write(ERROR_BYTE);
+		Serial.write(211);
+		dumpLog();
+		Serial.write(211);
+	}
+	return byteCount == (uartBufferSize - 2);
     }
 
     bool StreamWithCTS::canRead(){
