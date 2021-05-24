@@ -14,7 +14,6 @@ class StreamWithCTS{
     unsigned int uartBufferSize = 0;
     RingBuffer *sendBuffer = NULL;
     RingBuffer *receiveBuffer = NULL;
-    RingBuffer *dataBuffer = NULL;
     bool cts = false;
     unsigned long bytesSent = 0;
     unsigned long bytesReceived = 0;
@@ -31,7 +30,7 @@ class StreamWithCTS{
     
     //command byte callback
     void (*commandCallback)(StreamWithCTS*, byte);
-    void (*dataHandler)(StreamWithCTS*, RingBuffer*, bool);
+    void (*dataHandler)(StreamWithCTS*, bool);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
@@ -57,7 +56,7 @@ class StreamWithCTS{
     ~StreamWithCTS();
 
     void begin(Stream *stream, void (*callback)(StreamWithCTS*, byte) = NULL);
-    bool setDataHandler(void (*handler)(StreamWithCTS*, RingBuffer*, bool), int size);
+    bool setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void receive();
     void process();
     void send();
@@ -65,8 +64,9 @@ class StreamWithCTS{
     bool canWrite();
     bool requiresCTS(unsigned long byteCount);
     byte read();
-    bool write(byte b);
-    bool write(byte *bytes, int size);
+    bool write(byte b, bool addSlashes = true);
+    bool write(byte *bytes, int size, bool addSlashes = true, bool addEndByte = true);
+    bool isSystemByte(byte b);
     bool isClearToSend();
     void reset();
     unsigned int getUartBufferSize();

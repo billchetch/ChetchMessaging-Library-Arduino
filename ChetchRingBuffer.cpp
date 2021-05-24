@@ -31,6 +31,10 @@ namespace Chetch{
       this->size = size;
     }
 
+    byte *RingBuffer::getBuffer(){
+      return buffer;
+    }
+
     void RingBuffer::reset(){
       readPosition = 0;
       writePosition = 0;

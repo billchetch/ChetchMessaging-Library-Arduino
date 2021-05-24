@@ -18,7 +18,6 @@ namespace Chetch{
     StreamWithCTS::~StreamWithCTS(){
       if(receiveBuffer != NULL)delete receiveBuffer;
       if(sendBuffer != NULL)delete sendBuffer;
-      if(dataBuffer != NULL)delete dataBuffer; 
     }
 
     unsigned int StreamWithCTS::getUartBufferSize(){ 
@@ -35,7 +34,6 @@ namespace Chetch{
       while(stream->available())stream->read();
       receiveBuffer->reset();
       sendBuffer->reset();
-      if(dataBuffer != NULL)dataBuffer->reset();
       bytesReceived = 0;
       bytesSent = 0;
       cts = true;
@@ -54,11 +52,10 @@ namespace Chetch{
     }
 
 
-    bool StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, RingBuffer*, bool), int size){
+    bool StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, bool)){
       if(dataHandler != NULL)return false;
 
       dataHandler = handler;
-      dataBuffer = new RingBuffer(size);
     }
 
     byte StreamWithCTS::readFromStream(bool count){
@@ -112,6 +109,7 @@ namespace Chetch{
 		Serial.write(readHistory[idx]);
 	}
     }
+
     void StreamWithCTS::receive(){
       bool isData = true;
       bool continueReceiving = true;
@@ -121,15 +119,12 @@ namespace Chetch{
 	byte k = lastPeekedByte;
 	lastPeekedByte = b;
 	if(rslashed){
-	  //Serial.write(130);
-	  /*if(b == CTS_BYTE){
-	      Serial.write(ERROR_BYTE);
+	  if(b == CTS_BYTE){
+		Serial.write(ERROR_BYTE);
 	      Serial.write(251);
-	      Serial.write(k);
-      	      Serial.write(b);
-      	      dumpLog();
-	      Serial.write(252);
-	  }*/
+		dumpLog();
+		Serial.write(251);
+	  }
 	  isData = true;
 	} else {
 	//Serial.print("Peaking at: "); Serial.write(b); Serial.println("");
@@ -142,29 +137,12 @@ namespace Chetch{
 	      return; //cos this is a reset
 
 	    case END_BYTE:
-		Serial.write(247);
-	      //Serial.println("End byte received");
 	      b = readFromStream(); //remove from buffer
 	      isData = false;
-	      Serial.write(ERROR_BYTE);
-	      Serial.write(238);
-	      Serial.write(END_BYTE);
-	      endOfDataCount++;
-	      
-	      if(dataBuffer != NULL){
-	        while(!receiveBuffer->isEmpty()){
-		  if(dataBuffer->isFull()){
-			//Serial.write(ERROR_BYTE);
-			//Serial.write(225);
-		  }
-	    	  dataBuffer->write(read());
-	        }
-	        if(dataHandler != NULL){
+	      if(dataHandler != NULL){
 		  //Serial.println("END BYTE");
-		  dataHandler(this, dataBuffer, true);
-		  dataBuffer->reset();
-	        }
-	      }
+		  dataHandler(this, true);
+    	      }
 	      continueReceiving = false;
 	      break; //allow break so we count this
 
@@ -253,21 +231,12 @@ namespace Chetch{
     }
 
     void StreamWithCTS::process(){
-	if(dataBuffer != NULL){
-	  bool dataReceived = canRead() && !dataBuffer->isFull();
-	    
-	  while(canRead() && !dataBuffer->isFull()){
-	    byte b = read();
-	    dataBuffer->write(b);
-	  }
-
-	  if(dataHandler != NULL && dataReceived){
-	    dataHandler(this, dataBuffer, false);	
-	  }
+	if(dataHandler!= NULL){
+	  dataHandler(this, false);	
 	}	
     }
 
-    void StreamWithCTS::send(){
+    /*void StreamWithCTS::send(){
       byte b;
       while(!sendBuffer->isEmpty() && cts){
 	b = sendBuffer->peek();
@@ -305,6 +274,33 @@ namespace Chetch{
 	  cts = false;
 	}
       }
+    } */
+
+
+    void StreamWithCTS::send(){
+      byte b;
+      while(!sendBuffer->isEmpty() && cts){
+	b = sendBuffer->peek();
+	if(sslashed){
+	  sslashed = false;
+	  b = sendBuffer->read();
+	} else if(b == SLASH_BYTE) {
+	  if(requiresCTS(bytesSent + 1)){
+	      //Serial.println("Use pad byte");
+	    b = PAD_BYTE;
+	  } else {
+	    sslashed = true;
+	    b = sendBuffer->read();
+	  }
+	} else {
+	  b = sendBuffer->read();
+  	}
+
+	writeToStream(b);
+	if(requiresCTS(bytesSent)){
+	  cts = false;
+	}
+      }
     }
 
     bool StreamWithCTS::requiresCTS(unsigned long byteCount){
@@ -317,24 +313,52 @@ namespace Chetch{
 	return byteCount == (uartBufferSize - 2);
     }
 
+    bool StreamWithCTS::isSystemByte(byte b){
+	switch(b){
+	  case CTS_BYTE:
+	  case SLASH_BYTE:
+	  case PAD_BYTE:
+	  case END_BYTE:
+	  case RESET_BYTE:
+	  case ERROR_BYTE:
+	  case PING_BYTE:
+	    return true;
+
+	  default:
+	    return false;
+	}
+    }
+
     bool StreamWithCTS::canRead(){
       return !receiveBuffer->isEmpty();
     }
 
     bool StreamWithCTS::canWrite(){
-	return !sendBuffer->isFull();
+	return sendBuffer->remaining() > 1; //to allow for slashes
     }
 
     byte StreamWithCTS::read(){
       return receiveBuffer->read();
     }
 
-    bool StreamWithCTS::write(byte b){
+    bool StreamWithCTS::write(byte b, bool addSlashes){
+      if(addSlashes && isSystemByte(b)){
+	sendBuffer->write(SLASH_BYTE);
+      } 
       return sendBuffer->write(b);
     }
 
-    bool StreamWithCTS::write(byte *bytes, int size){
-      return sendBuffer->write(bytes, size);
+    bool StreamWithCTS::write(byte *bytes, int size, bool addSlashes, bool addEndByte){
+      for(int i = 0; i < size; i++){
+	if(!write(bytes[i], addSlashes)){
+	  return false;
+	}
+      }
+      if(addEndByte){
+	return write(END_BYTE, false);
+      } else {
+      	return true;
+      }
     }
 
     bool StreamWithCTS::isClearToSend(){
