@@ -22,6 +22,14 @@ namespace Chetch{
 
     RingBuffer::~RingBuffer(){
       if(deleteBuffer && buffer != NULL)delete[] buffer;
+
+      Marker *m = markers;
+      Marker *pm;
+      while(m != NULL){
+	pm = m;
+      	m = m->nextMarker;
+	delete pm;
+      }
     }
 
     void RingBuffer::setBuffer(byte *buf, int size){
@@ -38,13 +46,16 @@ namespace Chetch{
     void RingBuffer::reset(){
       readPosition = 0;
       writePosition = 0;
+      lastWritePosition = -1;
       full = false;
+      upcomingMarker = NULL;
     }
 
     bool RingBuffer::write(byte b){
       if(isFull()){
         return false;
       } else {
+	lastWritePosition = writePosition;
         buffer[writePosition] = b;
         writePosition = (writePosition + 1) % size;
         full = writePosition == readPosition;
@@ -65,8 +76,12 @@ namespace Chetch{
 
     byte RingBuffer::read(){
       byte b = buffer[readPosition];
+      if(upcomingMarker != NULL && upcomingMarker->position == readPosition){
+	upcomingMarker->position = -1;
+	updateMarkers();
+      }
       if(!isEmpty()){
-        readPosition = (readPosition + 1) % size;
+	readPosition = (readPosition + 1) % size;
       }
       full = false;
       return b;
@@ -103,4 +118,61 @@ namespace Chetch{
     int RingBuffer::getSize(){
 	return size;
     }
+
+    int RingBuffer::setMarker(){
+      int markerPosition = lastWritePosition;
+      
+      Marker *m = NULL;
+      if(markers == NULL){
+	m = new Marker();
+	markers = m;
+	markerCount++;
+      } else {
+	Marker *m1 = markers;
+	while(m1->nextMarker != NULL && m1->position >= 0 && m1->position != markerPosition){
+	  m1 = m1->nextMarker;
+	}
+	if(m1->position < 0 || m1->position == markerPosition){
+	  m = m1;
+	} else {
+	  m = new Marker();
+	  m1->nextMarker = m;
+	  markerCount++;
+	}
+      }
+      m->position = markerPosition;
+      updateMarkers();
+      return m->position;
+    }
+
+    bool RingBuffer::hasMarker(){
+      if(upcomingMarker != NULL && upcomingMarker->position == readPosition){
+     	return true;
+      } else {
+        return false;
+      }
+    }
+
+    void RingBuffer::updateMarkers(){
+      if(markers == NULL)return;
+      Marker* m = markers;
+      Marker* closestMarker = NULL;
+      while(m != NULL){
+	if(m->position >= 0){
+	  if(closestMarker == NULL){
+	    closestMarker = m;
+	  } else {
+	    int diff1 = closestMarker->position - readPosition;
+	    if(diff1 < 0)diff1 += size;
+	    int diff2 = m->position - readPosition;
+	    if(diff2 < 0)diff2 += size;
+
+	    if(diff2 < diff1)closestMarker = m;
+	  }
+	}
+	m = m->nextMarker;
+      }
+      upcomingMarker = closestMarker;
+    }
+
 } //end namespace
