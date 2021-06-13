@@ -14,11 +14,13 @@ class StreamWithCTS{
     unsigned int uartBufferSize = 0;
     RingBuffer *sendBuffer = NULL;
     RingBuffer *receiveBuffer = NULL;
-    bool cts = false;
+    bool cts = true;
+    bool rtr = true;
     unsigned long bytesSent = 0;
     unsigned long bytesReceived = 0;
     bool rslashed = false;
     bool sslashed = false;
+    bool smarked = false;
     
     byte readHistory[64];
     int readHistoryIndex = 0;
@@ -28,9 +30,11 @@ class StreamWithCTS{
     byte lastReceivedByte = 0;
     byte ctsCount = 0;
     
-    //command byte callback
+    
+    //allbacks
     void (*commandCallback)(StreamWithCTS*, byte);
-    void (*dataHandler)(StreamWithCTS*, bool);
+    bool (*dataHandler)(StreamWithCTS*, bool);
+    bool (*readyToReceive)(StreamWithCTS*);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
@@ -56,16 +60,19 @@ class StreamWithCTS{
     ~StreamWithCTS();
 
     void begin(Stream *stream, void (*callback)(StreamWithCTS*, byte) = NULL);
-    bool setDataHandler(void (*handler)(StreamWithCTS*, bool));
+    void setCommandCallback(void (*callback)(StreamWithCTS*, byte));
+    void setDataHandler(bool (*handler)(StreamWithCTS*, bool));
+    void setReadyToReceive(bool (*callback)(StreamWithCTS*));
     void receive();
     void process();
     void send();
     bool canRead();
     bool canWrite();
+    bool sendCTS();
     bool requiresCTS(unsigned long byteCount);
     byte read();
-    bool write(byte b, bool addSlashes = true);
-    bool write(byte *bytes, int size, bool addSlashes = true, bool addEndByte = true);
+    bool write(byte b, bool addMarker = false);
+    bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();
     void reset();
