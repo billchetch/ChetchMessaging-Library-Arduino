@@ -45,7 +45,7 @@ namespace Chetch
 		readyToReceive = callback;
     }
 
-    void StreamWithCTS::setDataHandler(bool (*handler)(StreamWithCTS*, bool))
+    void StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, bool))
 	{
 		dataHandler = handler;
     }
@@ -140,7 +140,8 @@ namespace Chetch
 		//As part of the loop (receive, process send) this will be called in situations where there is no data available.
 		//Given that sendCTS is dependent not only on bytes received but also potentially a user-defined method (canReceive)
 		//we allow for the posibiity that the conditions for sending CTS have changed even if there are no bytes to receive.
-		if(dataAvailable() == 0){
+		if(dataAvailable() == 0)
+		{
 			sendCTS();
 			return;
 		}
@@ -165,17 +166,15 @@ namespace Chetch
 						b = readFromStream(); //remove from buffer
 						reset(); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
 						if(commandCallback != NULL)commandCallback(this, b);
-						isData = false;
 						return; //cos this is a reset
 
 					case END_BYTE:
 						b = readFromStream(); //remove from buffer
 						isData = false;
-						receiveBuffer->setMarker();
 						if(dataHandler!= NULL){
-	  						dataHandler(this, true);	
+							dataHandler(this, true);	
 						}
-						break; //allow break so we count this
+						break;
 
    					case ERROR_BYTE:
 						b = readFromStream(); //remove from uart buffer
@@ -185,14 +184,12 @@ namespace Chetch
 						Serial.write(248);
 						if(commandCallback != NULL)commandCallback(this, b); //TODO: maybe make this return a bool for continueReceiving flag
 						isData = false;
-						break; //allow break so we count this
+						break; 
 
   					case SLASH_BYTE:
-						//Serial.print(">>>>>> Received Slashed"); printVitals();
 						b = readFromStream(); //remove from uart buffer
 						isData = false;
 						rslashed = true;
-						//Serial.write(131);
 						break;
 
 					case PAD_BYTE:
@@ -370,7 +367,7 @@ namespace Chetch
     }
 
     bool StreamWithCTS::canWrite(){
-		return sendBuffer->remaining() > 1; //to allow for slashes
+		return sendBuffer->remaining() >= 1;
     }
 
     byte StreamWithCTS::read(){
@@ -379,13 +376,20 @@ namespace Chetch
 
     bool StreamWithCTS::write(byte b, bool addMarker)
 	{
-		//if(addSlashes && isSystemByte(b)){
-		//sendBuffer->write(SLASH_BYTE);
-		//} 
 		bool retVal = sendBuffer->write(b);
 		if(retVal && addMarker)sendBuffer->setMarker();
 		return retVal;
     }
+
+	bool StreamWithCTS::write(int n, bool addMarker)
+	{
+		return write<int>(n, addMarker);
+	}
+
+	bool StreamWithCTS::write(long n, bool addMarker)
+	{
+		return write<long>(n, addMarker);
+	}
 
     bool StreamWithCTS::write(byte *bytes, int size, bool addEndMarker)
 	{

@@ -61,7 +61,7 @@ class StreamWithCTS{
 
     void begin(Stream *stream, void (*callback)(StreamWithCTS*, byte) = NULL);
     void setCommandCallback(void (*callback)(StreamWithCTS*, byte));
-    void setDataHandler(bool (*handler)(StreamWithCTS*, bool));
+    void setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void setReadyToReceive(bool (*callback)(StreamWithCTS*));
     void receive();
     void process();
@@ -72,6 +72,17 @@ class StreamWithCTS{
     bool requiresCTS(unsigned long byteCount);
     byte read();
     bool write(byte b, bool addMarker = false);
+    template <typename T> bool write(T t, bool addMarker = false){
+        byte b;
+		for(int i = 0; i < sizeof(t); i++){
+			b = (byte)(t >> 8*i);
+			if(!write(b))return false;
+		}
+		if(addMarker)sendBuffer->setMarker();
+		return true;
+    };
+    bool write(int n, bool addMarker);
+    bool write(long n, bool addMarker);
     bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();

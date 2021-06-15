@@ -75,16 +75,16 @@ namespace Chetch{
     }
 
     byte RingBuffer::read(){
-      byte b = buffer[readPosition];
-      if(upcomingMarker != NULL && upcomingMarker->position == readPosition){
-	upcomingMarker->position = -1;
-	updateMarkers();
-      }
-      if(!isEmpty()){
-	readPosition = (readPosition + 1) % size;
-      }
-      full = false;
-      return b;
+        byte b = buffer[readPosition];
+        if(upcomingMarker != NULL && upcomingMarker->position == readPosition){
+	        upcomingMarker->position = -1;
+	        updateMarkers();
+        }
+        if(!isEmpty()){
+	        readPosition = (readPosition + 1) % size;
+        }
+        full = false;
+        return b;
     }
 
     byte RingBuffer::peek(){
