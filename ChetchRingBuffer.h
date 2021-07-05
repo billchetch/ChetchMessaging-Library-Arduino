@@ -37,6 +37,8 @@ class RingBuffer{
     bool write(byte b);
     bool write(byte *bytes, int size);
     byte read();
+    int readToMarker(byte *bytes, int startAt = 0);
+    int readToMarkerCount();
     byte peek();
     bool isFull();
     bool isEmpty();
@@ -45,6 +47,7 @@ class RingBuffer{
     int getSize();
     int setMarker();
     bool hasMarker();
+    bool hasUpcomingMarker();
     void updateMarkers();
 };
 } //end namespace

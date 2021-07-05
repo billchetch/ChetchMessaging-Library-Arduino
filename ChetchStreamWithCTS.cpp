@@ -3,18 +3,16 @@
 namespace Chetch
 {
 
-	StreamWithCTS::StreamWithCTS(unsigned int uartBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize)
+	StreamWithCTS::StreamWithCTS(unsigned int uartLocalBufferSize, unsigned int uartRemoteBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize)
 	{
 
-		this->uartBufferSize = uartBufferSize;
+		this->uartLocalBufferSize = uartLocalBufferSize;
+		this->uartRemoteBufferSize = uartRemoteBufferSize;
 
 		receiveBuffer = new RingBuffer(receiveBufferSize);
 		sendBuffer = new RingBuffer(sendBufferSize);
 
 		cts = true;
-
-		commandCallback = NULL;
-		//dataHandler = NULL;
 	}
 
     StreamWithCTS::~StreamWithCTS()
@@ -23,21 +21,21 @@ namespace Chetch
 		if(sendBuffer != NULL)delete sendBuffer;
     }
 
-    unsigned int StreamWithCTS::getUartBufferSize()
-	{ 
-		return uartBufferSize; 
-    }
-
-    void StreamWithCTS::begin(Stream *stream, void (*callback)(StreamWithCTS*, byte))
+    
+    void StreamWithCTS::begin(Stream *stream)
 	{
 		this->stream = stream;
 		reset();
-		setCommandCallback(callback);
+	}
+
+    void StreamWithCTS::setResetCallback(void (*callback)(StreamWithCTS*))
+	{
+		resetCallback = callback;
     }
 
-    void StreamWithCTS::setCommandCallback(void (*callback)(StreamWithCTS*, byte))
+	void StreamWithCTS::setEventCallback(void (*callback)(StreamWithCTS*))
 	{
-		commandCallback = callback;
+		eventCallback = callback;
     }
 
     void StreamWithCTS::setReadyToReceive(bool (*callback)(StreamWithCTS*))
@@ -58,8 +56,8 @@ namespace Chetch
 		bytesReceived = 0;
 		bytesSent = 0;
 		cts = true;
-		rtr = true;
 		rslashed = false;
+		revent = false;
 		sslashed = false;
 		smarked = false;
 		error = 0;
@@ -74,12 +72,16 @@ namespace Chetch
 		for(int i = 0; i < 64; i++){
 			readHistory[i] = 0;
 		}
+
+		sendEvent(Event::RESET);
     }    
 
     byte StreamWithCTS::readFromStream(bool count)
 	{
 		if(count)bytesReceived++;
 		byte b = stream->read();
+
+		//remove this
 		readHistory[readHistoryIndex] = b;
 		readHistoryIndex = (readHistoryIndex + 1) % 64;
 		return b;
@@ -89,7 +91,6 @@ namespace Chetch
 	{
 		if(count)bytesSent++;
 		stream->write(b);
-		//stream->println(b);
 		if(flush)stream->flush();
     }
 
@@ -154,39 +155,36 @@ namespace Chetch
 		while(dataAvailable() > 0 && continueReceiving)
 		{
 			b = peekAtStream(); //we peek in case this is a data byte but the receive buffer is full
-			if(rslashed)
+			if(revent)
+			{
+				b = readFromStream(false);
+				if(eventCallback != NULL)eventCallback(b);
+				revent = false;
+				isData = false;
+			}
+			else if(rslashed)
 			{
 				isData = true;
 			} 
 			else 
 			{
-				//Serial.print("Peaking at: "); Serial.write(b); Serial.println("");
 				switch(b){
 					case RESET_BYTE:
 						b = readFromStream(); //remove from buffer
 						reset(); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
-						if(commandCallback != NULL)commandCallback(this, b);
+						if(resetCallback != NULL)resetCallback(this);
 						return; //cos this is a reset
 
 					case END_BYTE:
 						b = readFromStream(); //remove from buffer
 						isData = false;
+						receiveBuffer->setMarker();
 						if(dataHandler!= NULL){
 							dataHandler(this, true);	
 						}
 						break;
 
-   					case ERROR_BYTE:
-						b = readFromStream(); //remove from uart buffer
-						Serial.write(ERROR_BYTE);
-						Serial.write(248);
-						dumpLog();
-						Serial.write(248);
-						if(commandCallback != NULL)commandCallback(this, b); //TODO: maybe make this return a bool for continueReceiving flag
-						isData = false;
-						break; 
-
-  					case SLASH_BYTE:
+   					case SLASH_BYTE:
 						b = readFromStream(); //remove from uart buffer
 						isData = false;
 						rslashed = true;
@@ -197,13 +195,10 @@ namespace Chetch
 						isData = false; //so we jus discard this byte afer counting
 						break;
 
-					case PING_BYTE:
-						Serial.write(ERROR_BYTE);
-						Serial.write(249);
-						b = readFromStream(); //remove from uart buffer
-						isData = false;
-						dumpLog();
-						Serial.write(249);
+					case EVENT_BYTE:
+						b = readFromStream(false); //remove from buffer
+						isData = false; 
+						revent = true;
 						break;
 
 					case CTS_BYTE:
@@ -226,7 +221,7 @@ namespace Chetch
 				if(receiveBuffer->isFull())
 				{
 					//Serial.println("RB buffer full");
-					Serial.write(242);
+					sendEvent(Event::RECEIVE_BUFFER_FULL);
 					continueReceiving = false;
 				} 
 				else 
@@ -237,9 +232,8 @@ namespace Chetch
 				}
 			}
 	
-			//finally if we've removed enough bytes from the uart buffer AND '
+			//finally if we've removed enough bytes from the uart buffer AND we are 'ready to receive' then send CTS
 			sendCTS();
-
 		} //end data available loop      
     }
 
@@ -249,32 +243,6 @@ namespace Chetch
 			dataHandler(this, false);	
 		}	
     }
-
-    /*void StreamWithCTS::send(){
-      byte b;
-      while(!sendBuffer->isEmpty() && cts){
-	b = sendBuffer->peek();
-	if(sslashed){
-	  sslashed = false;
-	  b = sendBuffer->read();
-	} else if(b == SLASH_BYTE) {
-	  if(requiresCTS(bytesSent + 1)){
-	      //Serial.println("Use pad byte");
-	    b = PAD_BYTE;
-	  } else {
-	    sslashed = true;
-	    b = sendBuffer->read();
-	  }
-	} else {
-	  b = sendBuffer->read();
-  	}
-
-	writeToStream(b);
-	if(requiresCTS(bytesSent)){
-	  cts = false;
-	}
-      }
-    }*/
 
     void StreamWithCTS::send()
 	{
@@ -299,7 +267,7 @@ namespace Chetch
 				b = sendBuffer->peek();
 				if(isSystemByte(b))
 				{
-					if(requiresCTS(bytesSent + 1)){
+					if(requiresCTS(bytesSent + 1, uartRemoteBufferSize)){
 						//Serial.println("Use pad byte");
 						b = PAD_BYTE;
 					} 
@@ -318,25 +286,27 @@ namespace Chetch
 			}
 
 			writeToStream(b);
-			if(requiresCTS(bytesSent)){
+			if(requiresCTS(bytesSent, uartRemoteBufferSize)){
 				cts = false;
 			}
 		} //end sending loop
     }
 
-    bool StreamWithCTS::requiresCTS(unsigned long byteCount)
+    bool StreamWithCTS::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
 	{
-		if(byteCount > (uartBufferSize - 2)){
+		if(bufferSize == 0)return false;
+		/*if(byteCount > (uartBufferSize - 2)){
 			Serial.write(ERROR_BYTE);
 			Serial.write(211);
 			dumpLog();
 			Serial.write(211);
-		}
-		return byteCount == (uartBufferSize - 2);
+		}*/
+		return byteCount == (bufferSize - 2);
     }
 
+	
 	bool StreamWithCTS::sendCTS(){
-		if(requiresCTS(bytesReceived) && (readyToReceive == NULL || readyToReceive(this)))
+		if(requiresCTS(bytesReceived, uartLocalBufferSize) && (readyToReceive == NULL || readyToReceive(this)))
 		{
 			writeToStream(CTS_BYTE, false, true);
 			bytesReceived = 0;
@@ -346,6 +316,11 @@ namespace Chetch
 		}
 	}
 
+	void StreamWithCTS::sendEvent(byte e){
+		writeToStream(EVENT_BYTE, false);
+		writeToStream(e, false, true);
+	}
+
     bool StreamWithCTS::isSystemByte(byte b){
 		switch(b){
 			case CTS_BYTE:
@@ -353,8 +328,7 @@ namespace Chetch
 			case PAD_BYTE:
 			case END_BYTE:
 			case RESET_BYTE:
-			case ERROR_BYTE:
-			case PING_BYTE:
+			case EVENT_BYTE:
 				return true;
 
 			default:
@@ -362,17 +336,25 @@ namespace Chetch
 		}
     }
 
-    bool StreamWithCTS::canRead(){
-		return !receiveBuffer->isEmpty();
+    bool StreamWithCTS::canRead(unsigned int byteCount){
+		return receiveBuffer->used() >= byteCount;
     }
 
-    bool StreamWithCTS::canWrite(){
-		return sendBuffer->remaining() >= 1;
+    bool StreamWithCTS::canWrite(unsigned int byteCount){
+		return sendBuffer->remaining() >= byteCount;
     }
 
     byte StreamWithCTS::read(){
 		return receiveBuffer->read();
     }
+
+	int StreamWithCTS::bytesToRead(bool untilMarker = true){
+		if(untilMarker){
+			return receiveBuffer->readToMarkerCount();
+		} else {
+			return receiveBuffer->used();
+		}
+	}
 
     bool StreamWithCTS::write(byte b, bool addMarker)
 	{

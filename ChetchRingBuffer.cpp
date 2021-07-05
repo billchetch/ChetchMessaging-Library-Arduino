@@ -49,6 +49,11 @@ namespace Chetch{
       lastWritePosition = -1;
       full = false;
       upcomingMarker = NULL;
+      Marker* m = markers;
+      while(m != NULL){
+        m->position = -1;
+        m = m->nextMarker;
+      }
     }
 
     bool RingBuffer::write(byte b){
@@ -87,6 +92,28 @@ namespace Chetch{
         return b;
     }
 
+    int RingBuffer::readToMarker(byte *bytes, int startAt){
+        if(!hasUpcomingMarker())return 0;
+
+        int n = 0;
+        while(true){
+            bool hm = hasMarker();
+            byte b = read();
+            bytes[startAt + n] = b;
+            n++;
+            if(hm)break;
+        }
+        return n;
+    }
+
+    int RingBuffer::readToMarkerCount(){
+        if(!hasUpcomingMarker())return 0;
+
+        int r = upcomingMarker->position - readPosition;
+        if(r < 0)r += size;
+        return r + 1;
+    }
+
     byte RingBuffer::peek(){
         return buffer[readPosition];
     }
@@ -120,6 +147,8 @@ namespace Chetch{
     }
 
     int RingBuffer::setMarker(){
+      if(isEmpty())return -1;
+
       int markerPosition = lastWritePosition;
       
       Marker *m = NULL;
@@ -151,6 +180,14 @@ namespace Chetch{
       } else {
         return false;
       }
+    }
+
+    bool RingBuffer::hasUpcomingMarker(){
+        if(hasMarker()){
+            return true;
+        } else if(upcomingMarker != NULL) {
+            return upcomingMarker->position != -1;
+        }
     }
 
     void RingBuffer::updateMarkers(){
