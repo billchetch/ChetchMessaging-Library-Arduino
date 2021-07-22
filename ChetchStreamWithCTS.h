@@ -31,12 +31,12 @@ class StreamWithCTS{
     byte lastReceivedByte = 0;
     byte ctsCount = 0;
     
-    
-    //allbacks
-    void (*resetCallback)(StreamWithCTS*);
-    void (*eventCallback)(StreamWithCTS*);
+    //callbacks
+    void (*resetHandler)(StreamWithCTS*);
+    void (*eventHandler)(StreamWithCTS*);
     bool (*dataHandler)(StreamWithCTS*, bool);
-    bool (*readyToReceive)(StreamWithCTS*);
+    bool (*respondHandler)(StreamWithCTS*, int);
+    bool (*readyToReceiveHandler)(StreamWithCTS*);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
@@ -57,9 +57,7 @@ class StreamWithCTS{
     enum Event {
         RESET = 1,
 	    RECEIVE_BUFFER_FULL = 2,
-		
 	};
-    
     
     int error = 0;
     
@@ -68,13 +66,16 @@ class StreamWithCTS{
     ~StreamWithCTS();
 
     void begin(Stream *stream);
-    void setResetCallback(void (*callback)(StreamWithCTS*));
-    void setEventCallback(void (*callback)(StreamWithCTS*));
+    void setResetHandler(void (*handler)(StreamWithCTS*));
+    void setEventHandler(void (*handler)(StreamWithCTS*));
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
-    void setReadyToReceive(bool (*callback)(StreamWithCTS*));
+    void setRespondHandler(void (*handler)(StreamWithCTS*, int));
+    void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*));
     void receive();
     void process();
     void send();
+    void handleData(bool endOfData);
+    bool readyToReceive();
     bool canRead(unsigned int byteCoun = 1);
     bool canWrite(unsigned int byteCoun = 1);
     bool sendCTS();
@@ -83,6 +84,7 @@ class StreamWithCTS{
     byte read();
     int bytesToRead(bool untilMarker = true);
     bool write(byte b, bool addMarker = false);
+    void endWrite(); //sets send buffer marker
     template <typename T> bool write(T t, bool addMarker = false){
         byte b;
 		for(int i = 0; i < sizeof(t); i++){

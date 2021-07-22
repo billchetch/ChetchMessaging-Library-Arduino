@@ -28,25 +28,29 @@ namespace Chetch
 		reset();
 	}
 
-    void StreamWithCTS::setResetCallback(void (*callback)(StreamWithCTS*))
+    void StreamWithCTS::setResetHandler(void (*callback)(StreamWithCTS*))
 	{
-		resetCallback = callback;
+		resetHandler = callback;
     }
 
-	void StreamWithCTS::setEventCallback(void (*callback)(StreamWithCTS*))
+	void StreamWithCTS::setEventHandler(void (*callback)(StreamWithCTS*))
 	{
-		eventCallback = callback;
+		eventHandler = callback;
     }
 
-    void StreamWithCTS::setReadyToReceive(bool (*callback)(StreamWithCTS*))
+    void StreamWithCTS::setReadyToReceiveHandler(bool (*callback)(StreamWithCTS*))
 	{
-		readyToReceive = callback;
+		readyToReceiveHandler = callback;
     }
 
-    void StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, bool))
+    void StreamWithCTS::setDataHandler(void (*callback)(StreamWithCTS*, bool))
 	{
-		dataHandler = handler;
+		dataHandler = callback;
     }
+
+	void StreamWithCTS::setRespondHandler(void (*callback)(StreamWithCTS*, int)){
+		respondHandler = callback;
+	}
 
     void StreamWithCTS::reset()
 	{
@@ -158,7 +162,7 @@ namespace Chetch
 			if(revent)
 			{
 				b = readFromStream(false);
-				if(eventCallback != NULL)eventCallback(b);
+				if(eventHandler != NULL)eventHandler(b);
 				revent = false;
 				isData = false;
 			}
@@ -172,16 +176,14 @@ namespace Chetch
 					case RESET_BYTE:
 						b = readFromStream(); //remove from buffer
 						reset(); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
-						if(resetCallback != NULL)resetCallback(this);
+						if(resetHandler != NULL)resetHandler(this);
 						return; //cos this is a reset
 
 					case END_BYTE:
 						b = readFromStream(); //remove from buffer
 						isData = false;
 						receiveBuffer->setMarker();
-						if(dataHandler!= NULL){
-							dataHandler(this, true);	
-						}
+						handleData(true);
 						break;
 
    					case SLASH_BYTE:
@@ -239,9 +241,7 @@ namespace Chetch
 
     void StreamWithCTS::process()
 	{
-		if(dataHandler!= NULL){
-			dataHandler(this, false);	
-		}	
+		handleData(false);
     }
 
     void StreamWithCTS::send()
@@ -292,21 +292,32 @@ namespace Chetch
 		} //end sending loop
     }
 
+
+	void StreamWithCTS::handleData(bool endOfData){
+		if(dataHandler != NULL){
+			dataHandler(this, endOfData);
+		}
+		if(respondHandler != NULL && sendBuffer->isEmpty() && bytesToRead() > 0){
+			respondHandler(this, bytesToRead());
+		}
+	}
+
     bool StreamWithCTS::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
 	{
 		if(bufferSize == 0)return false;
-		/*if(byteCount > (uartBufferSize - 2)){
-			Serial.write(ERROR_BYTE);
-			Serial.write(211);
-			dumpLog();
-			Serial.write(211);
-		}*/
 		return byteCount == (bufferSize - 2);
     }
 
-	
+	bool StreamWithCTS::readyToReceive(){
+		if(readyToReceiveHandler!= NULL){
+			return readyToReceiveHandler(this);	
+		} else {
+			return sendBuffer->isEmpty() && bytesToRead() == 0;
+		}
+	}
+
 	bool StreamWithCTS::sendCTS(){
-		if(requiresCTS(bytesReceived, uartLocalBufferSize) && (readyToReceive == NULL || readyToReceive(this)))
+		if(requiresCTS(bytesReceived, uartLocalBufferSize) && readyToReceive())
 		{
 			writeToStream(CTS_BYTE, false, true);
 			bytesReceived = 0;
@@ -348,7 +359,7 @@ namespace Chetch
 		return receiveBuffer->read();
     }
 
-	int StreamWithCTS::bytesToRead(bool untilMarker = true){
+	int StreamWithCTS::bytesToRead(bool untilMarker){
 		if(untilMarker){
 			return receiveBuffer->readToMarkerCount();
 		} else {
@@ -384,6 +395,10 @@ namespace Chetch
 		}
 		return true;
     }
+
+	void StreamWithCTS::endWrite(){
+		sendBuffer->setMarker();
+	}
 
     bool StreamWithCTS::isClearToSend()
 	{

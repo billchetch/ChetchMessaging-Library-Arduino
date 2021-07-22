@@ -187,6 +187,8 @@ namespace Chetch{
             return true;
         } else if(upcomingMarker != NULL) {
             return upcomingMarker->position != -1;
+        } else {
+            return false;
         }
     }
 
