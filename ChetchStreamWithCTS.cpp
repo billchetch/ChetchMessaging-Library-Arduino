@@ -48,8 +48,12 @@ namespace Chetch
 		dataHandler = callback;
     }
 
-	void StreamWithCTS::setRespondHandler(void (*callback)(StreamWithCTS*, int)){
-		respondHandler = callback;
+	void StreamWithCTS::setReceiveHandler(void (*callback)(StreamWithCTS*, int)){
+		receiveHandler = callback;
+	}
+
+	void StreamWithCTS::setSendHandler(void (*callback)(StreamWithCTS*)){
+		sendHandler = callback;
 	}
 
     void StreamWithCTS::reset()
@@ -67,16 +71,6 @@ namespace Chetch
 		error = 0;
       
       
-		//temp
-		ctsCount = 0;
-		endOfDataCount = 0;
-		lastPeekedByte = 0;
-		lastReadByte = 0;
-		lastReceivedByte = 0;
-		for(int i = 0; i < 64; i++){
-			readHistory[i] = 0;
-		}
-
 		sendEvent(Event::RESET);
     }    
 
@@ -84,10 +78,6 @@ namespace Chetch
 	{
 		if(count)bytesReceived++;
 		byte b = stream->read();
-
-		//remove this
-		readHistory[readHistoryIndex] = b;
-		readHistoryIndex = (readHistoryIndex + 1) % 64;
 		return b;
     }
 
@@ -132,12 +122,7 @@ namespace Chetch
 
     void StreamWithCTS::dumpLog()
 	{
-		Serial.write(ctsCount);
-		Serial.write((byte)bytesReceived);
-		for(int i = 0; i < 64; i++){
-			int idx = (readHistoryIndex + i) % 64;
-			Serial.write(readHistory[idx]);
-		}
+		
     }
 
     void StreamWithCTS::receive()
@@ -242,6 +227,10 @@ namespace Chetch
     void StreamWithCTS::process()
 	{
 		handleData(false);
+
+		if(sendHandler != NULL && sendBuffer->isEmpty()){
+			sendHandler(this);
+		}
     }
 
     void StreamWithCTS::send()
@@ -297,8 +286,8 @@ namespace Chetch
 		if(dataHandler != NULL){
 			dataHandler(this, endOfData);
 		}
-		if(respondHandler != NULL && sendBuffer->isEmpty() && bytesToRead() > 0){
-			respondHandler(this, bytesToRead());
+		if(receiveHandler != NULL && sendBuffer->isEmpty() && bytesToRead() > 0){
+			receiveHandler(this, bytesToRead());
 		}
 	}
 

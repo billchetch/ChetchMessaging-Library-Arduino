@@ -23,19 +23,12 @@ class StreamWithCTS{
     bool sslashed = false;
     bool smarked = false;
     
-    byte readHistory[64];
-    int readHistoryIndex = 0;
-    int endOfDataCount = 0;
-    byte lastPeekedByte = 0;
-    byte lastReadByte = 0;
-    byte lastReceivedByte = 0;
-    byte ctsCount = 0;
-    
     //callbacks
     void (*resetHandler)(StreamWithCTS*);
     void (*eventHandler)(StreamWithCTS*);
-    bool (*dataHandler)(StreamWithCTS*, bool);
-    bool (*respondHandler)(StreamWithCTS*, int);
+    void (*dataHandler)(StreamWithCTS*, bool);
+    void (*receiveHandler)(StreamWithCTS*, int);
+    void (*sendHandler)(StreamWithCTS*);
     bool (*readyToReceiveHandler)(StreamWithCTS*);
 
 
@@ -57,6 +50,7 @@ class StreamWithCTS{
     enum Event {
         RESET = 1,
 	    RECEIVE_BUFFER_FULL = 2,
+        CHECKSUM_FAILED = 3,
 	};
     
     int error = 0;
@@ -69,15 +63,16 @@ class StreamWithCTS{
     void setResetHandler(void (*handler)(StreamWithCTS*));
     void setEventHandler(void (*handler)(StreamWithCTS*));
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
-    void setRespondHandler(void (*handler)(StreamWithCTS*, int));
+    void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
+    void setSendHandler(void (*handler)(StreamWithCTS*));
     void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*));
     void receive();
     void process();
     void send();
     void handleData(bool endOfData);
     bool readyToReceive();
-    bool canRead(unsigned int byteCoun = 1);
-    bool canWrite(unsigned int byteCoun = 1);
+    bool canRead(unsigned int byteCount = 1);
+    bool canWrite(unsigned int byteCount = 1);
     bool sendCTS();
     void sendEvent(byte e);
     bool requiresCTS(unsigned int byteCount, unsigned int bufferSize);
