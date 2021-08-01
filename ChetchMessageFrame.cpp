@@ -61,17 +61,16 @@ namespace Chetch{
 
     }
 
-    MessageFrame::MessageFrame(FrameSchema schema, MessageEncoding encoding){
+    MessageFrame::MessageFrame(FrameSchema schema, int maxPayload){
       this->schema = schema;
       dimensions = new Dimensions(schema);
 
-      bytes = new byte[dimensions->getPayloadIndex() + 256 + dimensions->checksum];
+      bytes = new byte[dimensions->getPayloadIndex() + maxPayload + dimensions->checksum];
 
       header = &bytes[0];
       payload = &bytes[dimensions->getPayloadIndex()];
 
       header[0] = (byte)schema;
-      setEncoding(encoding);
     }
 
     MessageFrame::~MessageFrame(){
@@ -147,15 +146,7 @@ namespace Chetch{
     bool MessageFrame::add(byte b){
       if(complete)return true;
 
-      if(startedAdding > 0 && millis() - startedAdding > MESSAGE_FRAME_ADD_TIMEOUT){
-         complete = true;
-         error = MessageFrame::FrameError::ADD_TIMEOUT;
-         return true;
-      }
-
       if(addPosition == 0){
-        startedAdding = millis();
-
         //Check the first byte is valid as this determines the dimensions of frame we are dealing with
         if(b != (byte)schema){
           error = MessageFrame::FrameError::NON_VALID_SCHEMA;
@@ -186,10 +177,28 @@ namespace Chetch{
       return complete;
     }
 
+    bool MessageFrame::add(byte *bytes, int byteCount){
+        if(byteCount <= 0){
+            error = MessageFrame::FrameError::INCOMPLETE_DATA;
+            return true;
+        }
+
+        bool complete = false;
+        for(int i = 0; i < byteCount; i++){
+            complete = add(bytes[i]);
+        }
+        return complete;
+    }
+
     bool MessageFrame::validate(){
       if(error != FrameError::NO_ERROR){
         return false;
       }
+      if(!complete){
+        error = MessageFrame::FrameError::INCOMPLETE_DATA;
+        return false;
+      }
+
       if(dimensions == NULL){
         error = FrameError::NO_DIMENSIONS;
         return false;
@@ -231,7 +240,6 @@ namespace Chetch{
     int MessageFrame::getSize(){ return dimensions == NULL ? -1 : dimensions->getSize(); }
 
     void MessageFrame::reset(){
-      startedAdding = -1;
       addPosition = 0;
       complete = false;
       error = FrameError::NO_ERROR;

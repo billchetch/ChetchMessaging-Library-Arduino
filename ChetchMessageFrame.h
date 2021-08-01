@@ -1,8 +1,6 @@
 #ifndef CHETCH_MESSAGE_FRAME_H
 #define CHETCH_MESSAGE_FRAME_H
 
-#define MESSAGE_FRAME_ADD_TIMEOUT 100000
-
 namespace Chetch{
 
 class MessageFrame{
@@ -33,7 +31,6 @@ class MessageFrame{
         NON_VALID_SCHEMA,
         NON_VALID_ENCODING,
         CHECKSUM_FAILED,
-        ADD_TIMEOUT
       };
 
     class Dimensions{
@@ -86,14 +83,13 @@ class MessageFrame{
     byte *checksum = NULL;
     byte *bytes = NULL; //will point to header or payload or checkum
 
-    long startedAdding = -1; //time in millis where we started addinig bytes
     int addPosition = 0;
     bool complete = false;
 
     FrameError error = FrameError::NO_ERROR;
 
     MessageFrame();
-    MessageFrame(FrameSchema schema, MessageEncoding encoding = MessageEncoding::BYTES_ARRAY);
+    MessageFrame(FrameSchema schema, int maxPayload);
     ~MessageFrame();
 
     void setEncoding(MessageEncoding encoding);
@@ -104,8 +100,9 @@ class MessageFrame{
     void add2payload(unsigned long val, int index);
     void add2payload(int val, int index);
     void add2payload(float val, int index);
-    byte *getBytes(bool addChecksum = false);
+    byte *getBytes(bool addChecksum = true);
     bool add(byte b);
+    bool add(byte *b, int byteCount);
     bool validate();
 
     byte *getPayload();
