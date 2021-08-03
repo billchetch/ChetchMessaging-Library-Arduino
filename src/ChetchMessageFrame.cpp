@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "ChetchMessageFrame.h"
 
-
 namespace Chetch{
 
 
