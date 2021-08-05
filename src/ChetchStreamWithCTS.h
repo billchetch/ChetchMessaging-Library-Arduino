@@ -51,6 +51,8 @@ class StreamWithCTS{
         RESET = 1,
 	    RECEIVE_BUFFER_FULL = 2,
         CHECKSUM_FAILED = 3,
+        UNKNOWN_ERROR = 4,
+        ALL_OK = 5
 	};
     
     int error = 0;
