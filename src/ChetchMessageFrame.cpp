@@ -1,42 +1,13 @@
 #include <Arduino.h>
+#include "ChetchUtils.h"
 #include "ChetchMessageFrame.h"
 
 namespace Chetch{
 
-
-    long MessageFrame::bytesToLong(byte *bytes, int offset, int numberOfBytes){
-      long retVal = 0L;
-      for(int i = offset; i < offset + numberOfBytes; i++){
-        retVal += (long)bytes[i] << (8*(i - offset));
-      }
-      return retVal;
-    }
-
-    int MessageFrame::bytesToInt(byte *bytes, int offset, int numberOfBytes){
-        return (int)bytesToLong(bytes, offset, numberOfBytes);
-    }
-
-    void MessageFrame::longToBytes(byte *bytes, long n, int offset, int padToLength){
-      for(int i = 0; i < padToLength; i++){
-        bytes[offset + i] = (byte)(n >> 8*i);
-      }
-    }
-
-    void MessageFrame::ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength){
-      for(int i = 0; i < padToLength; i++){
-        bytes[offset + i] = (byte)(n >> 8*i);
-      }
-    }
-
     void MessageFrame::intToBytes(byte *bytes, int n, int offset, int padToLength){
-      longToBytes(bytes, (long)n, offset, padToLength);
-    }
-
-    void MessageFrame::floatToBytes(byte *bytes, float n, int offset){
-        byte* bytes2add = (byte*)&n;
-	for(int i = 0; i < sizeof(n); i++){
-	    bytes[offset + i] = bytes2add[i];
-	}
+      for(int i = 0; i < padToLength; i++){
+        bytes[offset + i] = (byte)(n >> 8*i);
+      }
     }
 
     bool MessageFrame::isValidSchema(byte b){
@@ -88,10 +59,10 @@ namespace Chetch{
     }
 
     void MessageFrame::updatePayload(int payloadSize){
-	if(payloadSize > dimensions->payload){
-	    dimensions->payload = payloadSize;
+	    if(payloadSize > dimensions->payload){
+	        dimensions->payload = payloadSize;
       	    intToBytes(bytes, dimensions->payload, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
-	}
+	    }
     }
 
     void MessageFrame::setPayload(byte *payload, int payloadSize){
@@ -107,29 +78,11 @@ namespace Chetch{
     }
 
     void MessageFrame::add2payload(byte val, int index){
-	this->payload[index] = val;
-	updatePayload(index + sizeof(val));
+	    this->payload[index] = val;
+	    updatePayload(index + sizeof(val));
     }
 
-    void MessageFrame::add2payload(long val, int index){
-	longToBytes(this->payload, val, index, sizeof(val));
-	updatePayload(index + sizeof(val));
-    }
-
-    void MessageFrame::add2payload(int val, int index){
-	intToBytes(this->payload, val, index, sizeof(val));
-	updatePayload(index + sizeof(val));
-    }
-
-    void MessageFrame::add2payload(unsigned long val, int index){
-	ulongToBytes(this->payload, val, index, sizeof(val));
-	updatePayload(index + sizeof(val));
-    }
-
-    void MessageFrame::add2payload(float val, int index){
-	floatToBytes(this->payload, val, index);
-	updatePayload(index + sizeof(val));
-    }
+    
 
     byte *MessageFrame::getBytes(bool addChecksum){
       if(dimensions->checksum != 0 && addChecksum){
@@ -158,7 +111,7 @@ namespace Chetch{
         encoding = (MessageFrame::MessageEncoding)header[dimensions->getEncodingIndex()];
 
         //specify payload size
-        dimensions->payload = bytesToInt(header, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
+        dimensions->payload = Utils::bytesTo<int>(&header[dimensions->getPayloadSizeIndex()], dimensions->payloadSize, true);
 
         //specify checksum index
         if(dimensions->checksum > 0){

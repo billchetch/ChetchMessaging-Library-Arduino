@@ -40,12 +40,12 @@ class StreamWithCTS{
     
 
   public:
-    static const byte CTS_BYTE = (byte)0x74;
-    static const byte SLASH_BYTE = (byte)0x5c;
-    static const byte PAD_BYTE = (byte)0x70;
-    static const byte RESET_BYTE = (byte)0x63;
-    static const byte END_BYTE = (byte)0x64;
-    static const byte EVENT_BYTE = (byte)0x73;
+    static const byte CTS_BYTE = (byte)0x74; //116
+    static const byte SLASH_BYTE = (byte)0x5c; //92
+    static const byte PAD_BYTE = (byte)0x70; //112
+    static const byte RESET_BYTE = (byte)0x63; //99
+    static const byte END_BYTE = (byte)0x64; //100
+    static const byte EVENT_BYTE = (byte)0x73; //115
 
     enum Event {
         RESET = 1,

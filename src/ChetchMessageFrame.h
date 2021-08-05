@@ -65,12 +65,14 @@ class MessageFrame{
         int getSize(){ return payload > 0 && payloadSize > 0 ? getChecksumIndex() + checksum : -1; }
     };
 
-    static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
+    /*static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
     static int bytesToInt(byte *bytes, int offset, int numberOfBytes);
     static void longToBytes(byte *bytes, long n, int offset, int padToLength);
-    static void ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength);
+    static void ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength);*/
     static void intToBytes(byte *bytes, int n, int offset, int padToLength);
-    static void floatToBytes(byte *bytes, float n, int offset);
+   // static void floatToBytes(byte *bytes, float n, int offset);*/
+
+
     static bool isValidSchema(byte b);
     static bool isValidEncoding(byte b);
     static byte simpleChecksum(byte *bytes, int startIdx, int numberOfBytes);
@@ -96,10 +98,10 @@ class MessageFrame{
     MessageEncoding getEncoding();
     void setPayload(byte *payload, int payloadSize);
     void add2payload(byte val, int index);
-    void add2payload(long val, int index);
+    /*void add2payload(long val, int index);
     void add2payload(unsigned long val, int index);
     void add2payload(int val, int index);
-    void add2payload(float val, int index);
+    void add2payload(float val, int index);*/
     byte *getBytes(bool addChecksum = true);
     bool add(byte b);
     bool add(byte *b, int byteCount);

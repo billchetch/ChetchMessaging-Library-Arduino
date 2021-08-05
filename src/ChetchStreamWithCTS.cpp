@@ -28,6 +28,7 @@ namespace Chetch
 		reset();
 	}
 
+	
     void StreamWithCTS::setResetHandler(void (*callback)(StreamWithCTS*))
 	{
 		resetHandler = callback;
@@ -69,7 +70,6 @@ namespace Chetch
 		sslashed = false;
 		smarked = false;
 		error = 0;
-      
       
 		sendEvent(Event::RESET);
     }    
