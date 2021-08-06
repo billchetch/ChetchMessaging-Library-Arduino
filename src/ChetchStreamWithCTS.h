@@ -25,7 +25,7 @@ class StreamWithCTS{
     
     //callbacks
     void (*resetHandler)(StreamWithCTS*);
-    void (*eventHandler)(StreamWithCTS*);
+    void (*eventHandler)(StreamWithCTS*, byte);
     void (*dataHandler)(StreamWithCTS*, bool);
     void (*receiveHandler)(StreamWithCTS*, int);
     void (*sendHandler)(StreamWithCTS*);
@@ -63,7 +63,7 @@ class StreamWithCTS{
 
     void begin(Stream *stream);
     void setResetHandler(void (*handler)(StreamWithCTS*));
-    void setEventHandler(void (*handler)(StreamWithCTS*));
+    void setEventHandler(void (*handler)(StreamWithCTS*, byte));
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
     void setSendHandler(void (*handler)(StreamWithCTS*));

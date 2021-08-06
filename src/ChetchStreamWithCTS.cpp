@@ -34,7 +34,7 @@ namespace Chetch
 		resetHandler = callback;
     }
 
-	void StreamWithCTS::setEventHandler(void (*callback)(StreamWithCTS*))
+	void StreamWithCTS::setEventHandler(void (*callback)(StreamWithCTS*, byte))
 	{
 		eventHandler = callback;
     }
@@ -147,7 +147,7 @@ namespace Chetch
 			if(revent)
 			{
 				b = readFromStream(false);
-				if(eventHandler != NULL)eventHandler(b);
+				if(eventHandler != NULL)eventHandler(this, b);
 				revent = false;
 				isData = false;
 			}
