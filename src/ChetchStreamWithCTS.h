@@ -96,7 +96,7 @@ class StreamWithCTS{
     bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();
-    void reset();
+    void reset(bool sendEventByte = false);
     
     void printVitals();    
     void dumpLog();

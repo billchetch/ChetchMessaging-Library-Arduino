@@ -25,7 +25,7 @@ namespace Chetch
     void StreamWithCTS::begin(Stream *stream)
 	{
 		this->stream = stream;
-		reset();
+		reset(false); //do no send event byte
 	}
 
 	
@@ -57,7 +57,7 @@ namespace Chetch
 		sendHandler = callback;
 	}
 
-    void StreamWithCTS::reset()
+    void StreamWithCTS::reset(bool sendEventByte)
 	{
 		while(stream->available())stream->read();
 		receiveBuffer->reset();
@@ -70,8 +70,8 @@ namespace Chetch
 		sslashed = false;
 		smarked = false;
 		error = 0;
-      
-		sendEvent(Event::RESET);
+		
+		if(sendEventByte)sendEvent(Event::RESET);
     }    
 
     byte StreamWithCTS::readFromStream(bool count)
@@ -160,7 +160,7 @@ namespace Chetch
 				switch(b){
 					case RESET_BYTE:
 						b = readFromStream(); //remove from buffer
-						reset(); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
+						reset(true); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
 						if(resetHandler != NULL)resetHandler(this);
 						return; //cos this is a reset
 
