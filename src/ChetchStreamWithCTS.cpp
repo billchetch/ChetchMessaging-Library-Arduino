@@ -224,6 +224,7 @@ namespace Chetch
 			//If it's data then we add to the receive buffer
 			if(isData)
 			{
+				b = readFromStream();
 				if(receiveBuffer->isFull())
 				{
 					//Serial.println("RB buffer full");
@@ -232,7 +233,6 @@ namespace Chetch
 				} 
 				else 
 				{
-					b = readFromStream();
 					if(rslashed)rslashed = false;
 					receiveBuffer->write(b);
 				}
