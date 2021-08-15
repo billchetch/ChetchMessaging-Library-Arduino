@@ -25,13 +25,13 @@ namespace Chetch
     void StreamWithCTS::begin(Stream *stream)
 	{
 		this->stream = stream;
-		reset(false); //do no send event byte
+		reset(false, false); //do not reset remote and do not send event byte just sort local out
 	}
 
 	
-    void StreamWithCTS::setResetHandler(void (*callback)(StreamWithCTS*))
+    void StreamWithCTS::setCommandHandler(void (*callback)(StreamWithCTS*, byte))
 	{
-		resetHandler = callback;
+		commandHandler = callback;
     }
 
 	void StreamWithCTS::setEventHandler(void (*callback)(StreamWithCTS*, byte))
@@ -53,11 +53,15 @@ namespace Chetch
 		receiveHandler = callback;
 	}
 
-	void StreamWithCTS::setSendHandler(void (*callback)(StreamWithCTS*)){
+	void StreamWithCTS::setSendHandler(void (*callback)(StreamWithCTS*, int)){
 		sendHandler = callback;
 	}
 
-    void StreamWithCTS::reset(bool sendEventByte)
+	void StreamWithCTS::setCTSTimeout(int ms){
+		ctsTimeout = ms;
+	}
+
+	void StreamWithCTS::reset(bool sendCommandByte, bool sendEventByte)
 	{
 		while(stream->available())stream->read();
 		receiveBuffer->reset();
@@ -66,11 +70,13 @@ namespace Chetch
 		bytesSent = 0;
 		cts = true;
 		rslashed = false;
+		rcommand = false;
 		revent = false;
 		sslashed = false;
 		smarked = false;
 		error = 0;
 		
+		if(sendCommandByte)sendCommand(Command::RESET);
 		if(sendEventByte)sendEvent(Event::RESET);
     }    
 
@@ -144,9 +150,22 @@ namespace Chetch
 		while(dataAvailable() > 0 && continueReceiving)
 		{
 			b = peekAtStream(); //we peek in case this is a data byte but the receive buffer is full
-			if(revent)
+			
+			if(rcommand)
 			{
-				b = readFromStream(false);
+				b = readFromStream(false); //read the command
+				switch(b){
+					case (byte)Command::RESET:
+						reset(false, true);
+						break;
+				}
+				if(commandHandler != NULL)commandHandler(this, b);
+				rcommand = false;
+				isData = false;
+			}
+			else if(revent)
+			{
+				b = readFromStream(false); //read the event
 				if(eventHandler != NULL)eventHandler(this, b);
 				revent = false;
 				isData = false;
@@ -158,12 +177,6 @@ namespace Chetch
 			else 
 			{
 				switch(b){
-					case RESET_BYTE:
-						b = readFromStream(); //remove from buffer
-						reset(true); //note that this will set 'bytesReceived' to zero!!! this can cause counting problems so beware
-						if(resetHandler != NULL)resetHandler(this);
-						return; //cos this is a reset
-
 					case END_BYTE:
 						b = readFromStream(); //remove from buffer
 						isData = false;
@@ -180,6 +193,12 @@ namespace Chetch
 					case PAD_BYTE:
 						b = readFromStream(); //remove from buffer (and therfore count)
 						isData = false; //so we jus discard this byte afer counting
+						break;
+
+					case COMMAND_BYTE:
+						b = readFromStream(false); //remove from buffer
+						isData = false; 
+						rcommand = true;
 						break;
 
 					case EVENT_BYTE:
@@ -228,13 +247,22 @@ namespace Chetch
 	{
 		handleData(false);
 
-		if(sendHandler != NULL && sendBuffer->isEmpty()){
-			sendHandler(this);
+		if(sendHandler != NULL && !sendBuffer->isFull()){
+			sendHandler(this, sendBuffer->remaining());
 		}
     }
 
     void StreamWithCTS::send()
 	{
+		//check if timeout has been exceeded
+		if(ctsTimeout > 0){
+			if(!cts && (millis() - lastCTSrequired > ctsTimeout)) {
+				sendEvent(Event::CTS_TIMEOUT);
+				lastCTSrequired = millis(); //this is so it doesn't fire every call but every ctsTimeout interval instead'
+				return;
+			}
+		}
+
 		byte b;
 		while((!sendBuffer->isEmpty() || smarked) && cts)
 		{
@@ -277,16 +305,22 @@ namespace Chetch
 			writeToStream(b);
 			if(requiresCTS(bytesSent, uartRemoteBufferSize)){
 				cts = false;
+				lastCTSrequired = millis();
 			}
 		} //end sending loop
     }
 
+	void StreamWithCTS::loop(){
+		receive();
+		process();
+		send();
+	}
 
 	void StreamWithCTS::handleData(bool endOfData){
 		if(dataHandler != NULL){
 			dataHandler(this, endOfData);
 		}
-		if(receiveHandler != NULL && sendBuffer->isEmpty() && bytesToRead() > 0){
+		if(receiveHandler != NULL && bytesToRead() > 0){
 			receiveHandler(this, bytesToRead());
 		}
 	}
@@ -301,7 +335,7 @@ namespace Chetch
 		if(readyToReceiveHandler!= NULL){
 			return readyToReceiveHandler(this);	
 		} else {
-			return sendBuffer->isEmpty() && bytesToRead() == 0;
+			return bytesToRead() == 0;
 		}
 	}
 
@@ -316,9 +350,23 @@ namespace Chetch
 		}
 	}
 
-	void StreamWithCTS::sendEvent(byte e){
+
+	void StreamWithCTS::sendCommand(Command c){
+		sendEvent((byte)c);
+	}
+
+	void StreamWithCTS::sendCommand(byte b){
+		writeToStream(COMMAND_BYTE, false);
+		writeToStream(b, false, true);
+	}
+
+	void StreamWithCTS::sendEvent(Event e){
+		sendEvent((byte)e);
+	}
+
+	void StreamWithCTS::sendEvent(byte b){
 		writeToStream(EVENT_BYTE, false);
-		writeToStream(e, false, true);
+		writeToStream(b, false, true);
 	}
 
     bool StreamWithCTS::isSystemByte(byte b){
@@ -327,7 +375,8 @@ namespace Chetch
 			case SLASH_BYTE:
 			case PAD_BYTE:
 			case END_BYTE:
-			case RESET_BYTE:
+			//case RESET_BYTE:
+			case COMMAND_BYTE:
 			case EVENT_BYTE:
 				return true;
 
@@ -336,12 +385,12 @@ namespace Chetch
 		}
     }
 
-    bool StreamWithCTS::canRead(unsigned int byteCount){
-		return receiveBuffer->used() >= byteCount;
+    bool StreamWithCTS::canRead(int byteCount){
+		return byteCount < 0 ? receiveBuffer->isEmpty() : receiveBuffer->used() >= byteCount;
     }
 
-    bool StreamWithCTS::canWrite(unsigned int byteCount){
-		return sendBuffer->remaining() >= byteCount;
+    bool StreamWithCTS::canWrite(int byteCount){
+		return byteCount < 0 ? sendBuffer->isEmpty() : sendBuffer->remaining() >= byteCount;
     }
 
     byte StreamWithCTS::read(){

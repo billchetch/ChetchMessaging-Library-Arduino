@@ -16,20 +16,24 @@ class StreamWithCTS{
     RingBuffer *sendBuffer = NULL;
     RingBuffer *receiveBuffer = NULL;
     bool cts = true;
+    int ctsTimeout = -1; //wait for cts timeout
+    unsigned long lastCTSrequired = 0; //the last time cts flag set to false (i.e requires remoe to send a CTS byte)
     unsigned int bytesSent = 0;
     unsigned int bytesReceived = 0;
     bool rslashed = false;
+    bool rcommand = false;
     bool revent = false;
     bool sslashed = false;
     bool smarked = false;
     
     //callbacks
-    void (*resetHandler)(StreamWithCTS*);
+    //void (*resetHandler)(StreamWithCTS*);
+    void (*commandHandler)(StreamWithCTS*, byte);
     void (*eventHandler)(StreamWithCTS*, byte);
     void (*dataHandler)(StreamWithCTS*, bool);
     void (*receiveHandler)(StreamWithCTS*, int);
-    void (*sendHandler)(StreamWithCTS*);
     bool (*readyToReceiveHandler)(StreamWithCTS*);
+    void (*sendHandler)(StreamWithCTS*, int);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
@@ -43,40 +47,57 @@ class StreamWithCTS{
     static const byte CTS_BYTE = (byte)0x74; //116
     static const byte SLASH_BYTE = (byte)0x5c; //92
     static const byte PAD_BYTE = (byte)0x70; //112
-    static const byte RESET_BYTE = (byte)0x63; //99
     static const byte END_BYTE = (byte)0x64; //100
+    //static const byte RESET_BYTE = (byte)0x63; //99
+    static const byte COMMAND_BYTE = (byte)0x63; //99
     static const byte EVENT_BYTE = (byte)0x73; //115
 
-    enum Event {
+    enum class Command{
+        RESET = 1,
+        DEBUG_ON = 2,
+        DEBUG_OFF = 3,
+        REQUEST_STATUS = 100, 
+    };
+
+    enum class Event {
         RESET = 1,
 	    RECEIVE_BUFFER_FULL = 2,
-        CHECKSUM_FAILED = 3,
-        UNKNOWN_ERROR = 4,
-        ALL_OK = 5
-	};
+        RECEIVE_BUFFER_OVERFLOW_ALERT = 3,
+        SEND_BUFFER_FULL = 4,
+        SEND_BUFFER_OVERFLOW_ALERT = 5,
+        CHECKSUM_FAILED = 6,
+        UNKNOWN_ERROR = 7,
+        ALL_OK = 8,
+        CTS_TIMEOUT = 9,
+    };
     
     int error = 0;
     
-   
     StreamWithCTS(unsigned int uartLocalBufferSize, unsigned int uartRemotelBufferSize, unsigned int receiveBufferSize = 0, unsigned int sendBufferSize = 0);
     ~StreamWithCTS();
 
     void begin(Stream *stream);
-    void setResetHandler(void (*handler)(StreamWithCTS*));
-    void setEventHandler(void (*handler)(StreamWithCTS*, byte));
+    //void setResetHandler(void (*handler)(StreamWithCTS*));
+    void setCommandHandler(void (*handler)(StreamWithCTS*, byte)); //this stream, the command byte
+    void setEventHandler(void (*handler)(StreamWithCTS*, byte));  //this stream, the event byte
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
-    void setSendHandler(void (*handler)(StreamWithCTS*));
     void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*));
+    void setSendHandler(void (*handler)(StreamWithCTS*, int));
+    void setCTSTimeout(int ms); //in millis
     void receive();
     void process();
     void send();
+    void loop();
     void handleData(bool endOfData);
     bool readyToReceive();
-    bool canRead(unsigned int byteCount = 1);
-    bool canWrite(unsigned int byteCount = 1);
+    bool canRead(int byteCount = 1); //-ve value checks if receive buffer is empty
+    bool canWrite(int byteCount = 1); //-ve value checks if send buffer is empty
     bool sendCTS();
-    void sendEvent(byte e);
+    void sendCommand(Command c);
+    void sendCommand(byte b);
+    void sendEvent(Event e);
+    void sendEvent(byte b);
     bool requiresCTS(unsigned int byteCount, unsigned int bufferSize);
     byte read();
     int bytesToRead(bool untilMarker = true);
@@ -96,7 +117,7 @@ class StreamWithCTS{
     bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();
-    void reset(bool sendEventByte = false);
+    void reset(bool sendCommandByte, bool sendEventByte);
     
     void printVitals();    
     void dumpLog();
