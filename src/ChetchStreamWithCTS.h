@@ -15,21 +15,26 @@ class StreamWithCTS{
     unsigned int uartRemoteBufferSize = 0;
     RingBuffer *sendBuffer = NULL;
     RingBuffer *receiveBuffer = NULL;
+    bool localReset = false;
+    bool remoteReset = false;
     bool cts = true;
     int ctsTimeout = -1; //wait for cts timeout
     unsigned long lastCTSrequired = 0; //the last time cts flag set to false (i.e requires remoe to send a CTS byte)
     unsigned int bytesSent = 0;
     unsigned int bytesReceived = 0;
+    int maxDatablockSize = NO_LIMIT;
     bool rslashed = false;
     bool rcommand = false;
     bool revent = false;
     bool sslashed = false;
     bool smarked = false;
-    
+   
+  protected:  
     //callbacks
     //void (*resetHandler)(StreamWithCTS*);
     void (*commandHandler)(StreamWithCTS*, byte);
-    void (*eventHandler)(StreamWithCTS*, byte);
+    void (*localEventHandler)(StreamWithCTS*, byte);
+    void (*remoteEventHandler)(StreamWithCTS*, byte);
     void (*dataHandler)(StreamWithCTS*, bool);
     void (*receiveHandler)(StreamWithCTS*, int);
     bool (*readyToReceiveHandler)(StreamWithCTS*);
@@ -51,6 +56,11 @@ class StreamWithCTS{
     //static const byte RESET_BYTE = (byte)0x63; //99
     static const byte COMMAND_BYTE = (byte)0x63; //99
     static const byte EVENT_BYTE = (byte)0x73; //115
+
+    static const int NO_LIMIT = -1; //115
+    static const int UART_BUFFER_SIZE = -2;
+    static const int RECEIVE_BUFFER_SIZE = -3;
+    static const int SEND_BUFFER_SIZE = -4;
 
     enum class Command{
         RESET = 1,
@@ -77,23 +87,25 @@ class StreamWithCTS{
     ~StreamWithCTS();
 
     void begin(Stream *stream);
-    //void setResetHandler(void (*handler)(StreamWithCTS*));
     void setCommandHandler(void (*handler)(StreamWithCTS*, byte)); //this stream, the command byte
-    void setEventHandler(void (*handler)(StreamWithCTS*, byte));  //this stream, the event byte
+    void setEventHandlers(void (*handler1)(StreamWithCTS*, byte), void (*handler2)(StreamWithCTS*, byte));  //this stream, the event byte
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
     void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*));
     void setSendHandler(void (*handler)(StreamWithCTS*, int));
     void setCTSTimeout(int ms); //in millis
+    void setMaxDatablockSize(int max);
+    bool isReady();
+    void reset(bool sendCommandByte);
     void receive();
     void process();
     void send();
     void loop();
     void handleData(bool endOfData);
     bool readyToReceive();
-    bool canRead(int byteCount = 1); //-ve value checks if receive buffer is empty
-    bool canWrite(int byteCount = 1); //-ve value checks if send buffer is empty
-    bool sendCTS();
+    bool canReceive(int byteCount = 1); //-ve value checks if receive buffer is empty or uart buffer size
+    bool canSend(int byteCount = 1); //-ve value checks if send buffer is empty or uart buffer size
+    bool sendCTS(bool overrideFlowControl = false);
     void sendCommand(Command c);
     void sendCommand(byte b);
     void sendEvent(Event e);
@@ -117,7 +129,6 @@ class StreamWithCTS{
     bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();
-    void reset(bool sendCommandByte, bool sendEventByte);
     
     void printVitals();    
     void dumpLog();
