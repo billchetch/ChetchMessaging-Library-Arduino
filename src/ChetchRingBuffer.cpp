@@ -139,39 +139,46 @@ namespace Chetch{
     }
 
     int RingBuffer::remaining(){
-      return size - used(); 
+        return size - used(); 
     }
 
     int RingBuffer::getSize(){
-	return size;
+	    return size;
     }
 
-    int RingBuffer::setMarker(){
-      if(isEmpty())return -1;
+    RingBuffer::Marker* RingBuffer::setMarker(){
+        if(isEmpty())return NULL;
 
-      int markerPosition = lastWritePosition;
+        //we set the marker at the last write position
+        int markerPosition = lastWritePosition;
       
-      Marker *m = NULL;
-      if(markers == NULL){
-	m = new Marker();
-	markers = m;
-	markerCount++;
-      } else {
-	Marker *m1 = markers;
-	while(m1->nextMarker != NULL && m1->position >= 0 && m1->position != markerPosition){
-	  m1 = m1->nextMarker;
-	}
-	if(m1->position < 0 || m1->position == markerPosition){
-	  m = m1;
-	} else {
-	  m = new Marker();
-	  m1->nextMarker = m;
-	  markerCount++;
-	}
-      }
-      m->position = markerPosition;
-      updateMarkers();
-      return m->position;
+        Marker *m = NULL;
+        if(markers == NULL){
+	        m = new Marker();
+	        markers = m;
+	        markerCount++;
+        } else {
+            //loop until we get to the next available  marker
+	        Marker *m1 = markers;
+	        while(m1->nextMarker != NULL && m1->position >= 0 && m1->position != markerPosition){
+	            m1 = m1->nextMarker;
+	        }
+
+            //here m1 is either the very last marker (m1->nextMarker == NULL) OR m1 is not being used (m1->position < 0) 
+            //OR m1 position == the desiered markerPosition
+            if(m1->position < 0 || m1->position == markerPosition){ //if m1 is not being used or it's the desired position then use m1
+	            m = m1;
+	        } else { //otherwise (i.e. m1 is the last marker) we create a new marker and set m1->nextMarker to the new marker
+	            m = new Marker();
+	            m1->nextMarker = m;
+	            markerCount++;
+	        }
+        }
+
+        //Set the marker position
+        m->position = markerPosition;
+        updateMarkers();
+        return m;
     }
 
     bool RingBuffer::hasMarker(){
@@ -193,25 +200,62 @@ namespace Chetch{
     }
 
     void RingBuffer::updateMarkers(){
-      if(markers == NULL)return;
-      Marker* m = markers;
-      Marker* closestMarker = NULL;
-      while(m != NULL){
-	if(m->position >= 0){
-	  if(closestMarker == NULL){
-	    closestMarker = m;
-	  } else {
-	    int diff1 = closestMarker->position - readPosition;
-	    if(diff1 < 0)diff1 += size;
-	    int diff2 = m->position - readPosition;
-	    if(diff2 < 0)diff2 += size;
+        if(markers == NULL)return;
 
-	    if(diff2 < diff1)closestMarker = m;
-	  }
-	}
-	m = m->nextMarker;
-      }
-      upcomingMarker = closestMarker;
+        upcomingMarker = getClosestMarker(readPosition, true);
+    }
+
+    int RingBuffer::getMarkerCount(bool active){
+        Marker* m = markers;
+        int n = 0;
+        while(m != NULL){
+            if(m->position != -1 || !active)n++;
+            m = m->nextMarker;
+        }
+        return n;
+    }
+
+    RingBuffer::Marker *RingBuffer::getLastSetMarker(){
+        Marker *m = getClosestMarker(lastWritePosition, false);
+        return m;
+    }
+
+    int RingBuffer::lastSetMarkerCount(){
+        Marker *m = getLastSetMarker();
+        if(m == NULL){
+            return -1;
+        } else {
+            if(m->position > lastWritePosition){
+                return size - (m->position - lastWritePosition);
+            } else {
+                return lastWritePosition - m->position;
+            }
+        }
+    }
+
+    RingBuffer::Marker *RingBuffer::getClosestMarker(int position, bool forward){
+        Marker *m = markers;
+        Marker *closestMarker = NULL; //marker closest in front of current read posiion (i.e. upcoming marker)
+        while(m != NULL){
+            if(m->position >= 0){
+	            if(closestMarker == NULL){
+	                closestMarker = m;
+	            } else {
+                    int diff1 = closestMarker->position - position;
+                    int diff2 = m->position - position;
+                    if(forward){
+	                    if(diff1 < 0)diff1 += size;
+                        if(diff2 < 0)diff2 += size;
+                    } else {
+                        diff1 = diff1 <= 0 ? -1*diff1 : size - diff1;
+                        diff2 = diff2 <= 0 ? -1*diff2 : size - diff2;
+                    }
+                    if(diff2 < diff1)closestMarker = m;
+	            }
+            }
+	        m = m->nextMarker;
+        }
+        return closestMarker;
     }
 
 } //end namespace

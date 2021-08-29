@@ -42,7 +42,7 @@ namespace Chetch
 		remoteEventHandler = handler2;
     }
 
-    void StreamWithCTS::setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*))
+    void StreamWithCTS::setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*, bool))
 	{
 		readyToReceiveHandler = handler;
     }
@@ -76,6 +76,8 @@ namespace Chetch
 		bytesReceived = 0;
 		bytesSent = 0;
 		cts = true;
+		remoteRequestedCTS = false;
+		localRequestedCTS = false;
 		rslashed = false;
 		rcommand = false;
 		revent = false;
@@ -83,14 +85,19 @@ namespace Chetch
 		smarked = false;
 		error = 0;
 		
-		if(sendCommandByte)sendCommand(Command::RESET);
+		if(sendCommandByte){
+			remoteReset = false;
+			sendCommand(Command::RESET);
+		}
 		sendEvent(Event::RESET);
 		localReset = true;
     }    
 
     byte StreamWithCTS::readFromStream(bool count)
 	{
-		if(count)bytesReceived++;
+		if(count){
+			bytesReceived++;
+		}
 		byte b = stream->read();
 
 		//Flow control
@@ -101,7 +108,9 @@ namespace Chetch
 
     void StreamWithCTS::writeToStream(byte b, bool count, bool flush)
 	{
-		if(count)bytesSent++;
+		if(count){
+			bytesSent++;
+		}
 		stream->write(b);
 		if(flush)stream->flush();
 
@@ -180,6 +189,16 @@ namespace Chetch
 					case (byte)Command::RESET:
 						reset(false); //do NOT send command for remote to reset
 						break;
+					case (byte)Command::RESET_RECEIVE_BUFFER:
+						receiveBuffer->reset();
+						break;
+					case (byte)Command::RESET_SEND_BUFFER:
+						sendBuffer->reset();
+						break;
+
+					case (byte)Command::PING:
+						sendEvent(Event::PING_RECEIVED);
+						break;
 				}
 				if(commandHandler != NULL)commandHandler(this, b);
 				rcommand = false;
@@ -191,6 +210,15 @@ namespace Chetch
 				switch(b){
 					case (byte)Event::RESET:
 						remoteReset = true;
+						break;
+
+					case (byte)Event::CTS_TIMEOUT:
+						remoteRequestedCTS = true;
+						lastRemoteCTSRequest = millis(); //for a timeout
+						break;
+
+					case (byte)Event::CTS_REQUEST_TIMEOUT:
+                        localRequestedCTS = false; //remote request has timedout so reset this flag so the local can try and request again
 						break;
 				}
 				if(remoteEventHandler != NULL)remoteEventHandler(this, b);
@@ -239,6 +267,7 @@ namespace Chetch
 						if(!cts){ // we check so as to avoid unnecessary reseting of bytesSent
 							cts = true;
 							bytesSent = 0;
+							localRequestedCTS = false; //request has been grante
      						continueReceiving = false; //we exit the loop so as we can dispatch anything in the send buffer
 						}
 						isData = false;
@@ -256,7 +285,8 @@ namespace Chetch
 				b = readFromStream();
 				if(receiveBuffer->isFull())
 				{
-					//Serial.println("RB buffer full");
+					//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
+					//event firing too many times
 					sendEvent(Event::RECEIVE_BUFFER_FULL);
 					continueReceiving = false;
 				} 
@@ -264,6 +294,16 @@ namespace Chetch
 				{
 					if(rslashed)rslashed = false;
 					receiveBuffer->write(b);
+
+					if(maxDatablockSize > 0){
+						int n = receiveBuffer->lastSetMarkerCount();
+						if(n < 0)n = receiveBuffer->used();
+						if(n > maxDatablockSize){
+							//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
+							//event firing too many times
+							sendEvent(Event::MAX_DATABLOCK_SIZE_EXCEEDED);
+						}
+					}	
 				}
 			}		
 		} //end data available loop      
@@ -275,6 +315,17 @@ namespace Chetch
 
 		handleData(false);
 
+		if(remoteRequestedCTS){
+			if(readyToReceive(true)){
+				sendCTS(true);
+			} else {
+				if(millis() - lastRemoteCTSRequest > 2000){
+					remoteRequestedCTS = false;
+					sendEvent(Event::CTS_REQUEST_TIMEOUT);
+				}
+			}
+		}
+
 		if(sendHandler != NULL && !sendBuffer->isFull()){
 			sendHandler(this, sendBuffer->remaining());
 		}
@@ -285,10 +336,10 @@ namespace Chetch
 		if(!isReady())return;
 
 		//check if timeout has been exceeded
-		if(ctsTimeout > 0){
-			if(!cts && (millis() - lastCTSrequired > ctsTimeout)) {
+		if(!cts && ctsTimeout > 0 && !localRequestedCTS){
+			if((millis() - lastCTSrequired > ctsTimeout)) {
 				sendEvent(Event::CTS_TIMEOUT);
-				lastCTSrequired = millis(); //this is so it doesn't fire every call but every ctsTimeout interval instead'
+				localRequestedCTS = true;
 				return;
 			}
 		}
@@ -355,22 +406,26 @@ namespace Chetch
     bool StreamWithCTS::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
 	{
 		if(bufferSize == 0)return false;
-		return byteCount == (bufferSize - 2);
+		int limit = bufferSize - RESERVED_BUFFER_SIZE;
+		return byteCount == limit;
     }
 
-	bool StreamWithCTS::readyToReceive(){
+	bool StreamWithCTS::readyToReceive(bool request4cts){
 		if(readyToReceiveHandler!= NULL){
-			return readyToReceiveHandler(this);	
-		} else {
+			return readyToReceiveHandler(this, request4cts);	
+		} else if(request4cts){ //if the remoe has requested a cts to be sent
+			return canReceive(StreamWithCTS::UART_LOCAL_BUFFER_SIZE);
+		} else { //Normal flow control}
 			return bytesToRead() == 0;
 		}
 	}
 
 	bool StreamWithCTS::sendCTS(bool overrideFlowControl){
-		if((requiresCTS(bytesReceived, uartLocalBufferSize) && readyToReceive()) || overrideFlowControl)
+		if(overrideFlowControl || (requiresCTS(bytesReceived, uartLocalBufferSize) && readyToReceive(false)))
 		{
 			writeToStream(CTS_BYTE, false, true);
 			bytesReceived = 0;
+			remoteRequestedCTS = false; //close the request
 			return true; 
 		} else {
 			return false;
@@ -385,6 +440,10 @@ namespace Chetch
 	void StreamWithCTS::sendCommand(byte b){
 		writeToStream(COMMAND_BYTE, false);
 		writeToStream(b, false, true);
+	}
+
+	void StreamWithCTS::ping(){
+		sendCommand(Command::PING);
 	}
 
 	void StreamWithCTS::sendEvent(Event e){
@@ -413,23 +472,50 @@ namespace Chetch
 		}
     }
 
+	int StreamWithCTS::getLimit(int limit){
+		switch(limit){
+			case UART_LOCAL_BUFFER_SIZE:
+				return uartLocalBufferSize;
+
+			case UART_REMOTE_BUFFER_SIZE:
+				return uartRemoteBufferSize;
+
+			case RECEIVE_BUFFER_SIZE:
+				return receiveBuffer->getSize();
+
+			case SEND_BUFFER_SIZE:
+				return sendBuffer->getSize();
+
+			case MAX_DATABLOCK_SIZE:
+				return maxDatablockSize;
+
+			case CTS_LOCAL_LIMIT:
+				return uartLocalBufferSize - RESERVED_BUFFER_SIZE;
+
+			case CTS_REMOTE_LIMIT:
+				return uartRemoteBufferSize - RESERVED_BUFFER_SIZE;
+
+			default:
+				return limit;
+		}
+	}
+
+	unsigned int StreamWithCTS::getBytesReceived(){ return bytesReceived; }
+    unsigned int StreamWithCTS::getBytesSent(){ return bytesSent; }
+
     bool StreamWithCTS::canReceive(int byteCount){
 		if(byteCount == NO_LIMIT){
 			return  receiveBuffer->isEmpty();
-		} else if(byteCount == UART_BUFFER_SIZE){
-			return  receiveBuffer->remaining() >= uartLocalBufferSize; 
 		} else {
-			return receiveBuffer->remaining() >= byteCount;
+			return receiveBuffer->remaining() >= getLimit(byteCount);
 		}
     }
 
     bool StreamWithCTS::canSend(int byteCount){
 		if(byteCount == NO_LIMIT){
 			return  sendBuffer->isEmpty();
-		} else if(byteCount == UART_BUFFER_SIZE){
-			return  sendBuffer->remaining() >= uartLocalBufferSize; 
 		} else {
-			return sendBuffer->remaining() >= byteCount;
+			return sendBuffer->remaining() >= getLimit(byteCount);
 		}
     }
 

@@ -9,7 +9,7 @@ namespace Chetch{
 
 class StreamWithCTS{
 
-  public:
+  public: //TODO: change to private
     Stream *stream;
     unsigned int uartLocalBufferSize = 0;
     unsigned int uartRemoteBufferSize = 0;
@@ -19,6 +19,9 @@ class StreamWithCTS{
     bool remoteReset = false;
     bool cts = true;
     int ctsTimeout = -1; //wait for cts timeout
+    bool remoteRequestedCTS = false;
+    unsigned long lastRemoteCTSRequest = 0;
+    bool localRequestedCTS = false;
     unsigned long lastCTSrequired = 0; //the last time cts flag set to false (i.e requires remoe to send a CTS byte)
     unsigned int bytesSent = 0;
     unsigned int bytesReceived = 0;
@@ -37,7 +40,7 @@ class StreamWithCTS{
     void (*remoteEventHandler)(StreamWithCTS*, byte);
     void (*dataHandler)(StreamWithCTS*, bool);
     void (*receiveHandler)(StreamWithCTS*, int);
-    bool (*readyToReceiveHandler)(StreamWithCTS*);
+    bool (*readyToReceiveHandler)(StreamWithCTS*, bool);
     void (*sendHandler)(StreamWithCTS*, int);
 
 
@@ -57,16 +60,27 @@ class StreamWithCTS{
     static const byte COMMAND_BYTE = (byte)0x63; //99
     static const byte EVENT_BYTE = (byte)0x73; //115
 
-    static const int NO_LIMIT = -1; //115
-    static const int UART_BUFFER_SIZE = -2;
-    static const int RECEIVE_BUFFER_SIZE = -3;
-    static const int SEND_BUFFER_SIZE = -4;
+    static const byte RESERVED_BUFFER_SIZE = 2;
 
+    static const int NO_LIMIT = -1; 
+    static const int UART_LOCAL_BUFFER_SIZE = -2;
+    static const int UART_REMOTE_BUFFER_SIZE = -3;
+    static const int RECEIVE_BUFFER_SIZE = -4;
+    static const int SEND_BUFFER_SIZE = -5;
+    static const int MAX_DATABLOCK_SIZE = -6;
+    static const int CTS_LOCAL_LIMIT = -7;
+    static const int CTS_REMOTE_LIMIT = -8;
+    
+    
     enum class Command{
         RESET = 1,
         DEBUG_ON = 2,
         DEBUG_OFF = 3,
+        RESET_RECEIVE_BUFFER = 4,
+        RESET_SEND_BUFFER = 5,
+        PING = 6,
         REQUEST_STATUS = 100, 
+        
     };
 
     enum class Event {
@@ -79,6 +93,9 @@ class StreamWithCTS{
         UNKNOWN_ERROR = 7,
         ALL_OK = 8,
         CTS_TIMEOUT = 9,
+        MAX_DATABLOCK_SIZE_EXCEEDED = 10,
+        CTS_REQUEST_TIMEOUT = 11,
+        PING_RECEIVED = 12,
     };
     
     int error = 0;
@@ -91,7 +108,7 @@ class StreamWithCTS{
     void setEventHandlers(void (*handler1)(StreamWithCTS*, byte), void (*handler2)(StreamWithCTS*, byte));  //this stream, the event byte
     void setDataHandler(void (*handler)(StreamWithCTS*, bool));
     void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
-    void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*));
+    void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*, bool));
     void setSendHandler(void (*handler)(StreamWithCTS*, int));
     void setCTSTimeout(int ms); //in millis
     void setMaxDatablockSize(int max);
@@ -102,7 +119,7 @@ class StreamWithCTS{
     void send();
     void loop();
     void handleData(bool endOfData);
-    bool readyToReceive();
+    bool readyToReceive(bool request4cts);
     bool canReceive(int byteCount = 1); //-ve value checks if receive buffer is empty or uart buffer size
     bool canSend(int byteCount = 1); //-ve value checks if send buffer is empty or uart buffer size
     bool sendCTS(bool overrideFlowControl = false);
@@ -110,6 +127,7 @@ class StreamWithCTS{
     void sendCommand(byte b);
     void sendEvent(Event e);
     void sendEvent(byte b);
+    void ping();
     bool requiresCTS(unsigned int byteCount, unsigned int bufferSize);
     byte read();
     int bytesToRead(bool untilMarker = true);
@@ -129,7 +147,9 @@ class StreamWithCTS{
     bool write(byte *bytes, int size, bool addEndMarker = true);
     bool isSystemByte(byte b);
     bool isClearToSend();
-    
+    int getLimit(int limit);
+    unsigned int getBytesReceived();
+    unsigned int getBytesSent();
     void printVitals();    
     void dumpLog();
 };

@@ -35,7 +35,8 @@ namespace Chetch{
       this->schema = schema;
       dimensions = new Dimensions(schema);
 
-      bytes = new byte[dimensions->getPayloadIndex() + maxPayload + dimensions->checksum];
+      this->maxPayload = maxPayload;
+      bytes = new byte[dimensions->getFrameSize() + this->maxPayload];
 
       header = &bytes[0];
       payload = &bytes[dimensions->getPayloadIndex()];
@@ -190,6 +191,8 @@ namespace Chetch{
     byte *MessageFrame::getPayload(){ return payload; }
     int MessageFrame::getPayloadSize(){ return dimensions == NULL ? -1 : dimensions->payload; }
     int MessageFrame::getSize(){ return dimensions == NULL ? -1 : dimensions->getSize(); }
+    int MessageFrame::getFrameSize(){ return dimensions == NULL ? -1 : dimensions->getFrameSize(); }
+    int MessageFrame::getMaxSize(){ return maxPayload + getFrameSize(); }
 
     void MessageFrame::reset(){
       addPosition = 0;

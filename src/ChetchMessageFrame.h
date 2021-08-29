@@ -40,6 +40,7 @@ class MessageFrame{
         byte payloadSize = 0;
         int payload = 0;
         byte checksum;
+        byte frameSize = 0;
 
         Dimensions(FrameSchema frameSchema){
           schema = 1;
@@ -48,11 +49,13 @@ class MessageFrame{
             case SMALL_NO_CHECKSUM:
               payloadSize = 1;
               checksum = 0;
+              frameSize = 3;
               break;
 
             case SMALL_SIMPLE_CHECKSUM:
               payloadSize = 1;
               checksum = 1;
+              frameSize = 4;
               break;
           }
         }
@@ -63,6 +66,7 @@ class MessageFrame{
         int getPayloadIndex() { return getPayloadSizeIndex() + payloadSize; }
         int getChecksumIndex(){ return payload > 0 ? getPayloadIndex() + payload : -1; }
         int getSize(){ return payload > 0 && payloadSize > 0 ? getChecksumIndex() + checksum : -1; }
+        int getFrameSize(){ return frameSize; }
     };
 
     /*static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
@@ -84,6 +88,7 @@ class MessageFrame{
     byte *payload = NULL;
     byte *checksum = NULL;
     byte *bytes = NULL; //will point to header or payload or checkum
+    int maxPayload = 0;
 
     int addPosition = 0;
     bool complete = false;
@@ -110,6 +115,8 @@ class MessageFrame{
     byte *getPayload();
     int getPayloadSize();
     int getSize();
+    int getFrameSize();
+    int getMaxSize();
 
     void reset();
 
