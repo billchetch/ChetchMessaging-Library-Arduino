@@ -1,5 +1,5 @@
-#ifndef CHETCH_STREAM_WITH_CTS_H
-#define CHETCH_STREAM_WITH_CTS_H
+#ifndef CHETCH_STREAM_FLOW_CONTROLLER_H
+#define CHETCH_STREAM_FLOW_CONTROLLER_H
 
 #include <Arduino.h>
 #include "ChetchRingBuffer.h"
@@ -7,7 +7,7 @@
 
 namespace Chetch{
 
-class StreamWithCTS{
+class StreamFlowController{
 
   public: //TODO: change to private
     Stream *stream;
@@ -34,14 +34,14 @@ class StreamWithCTS{
    
   protected:  
     //callbacks
-    //void (*resetHandler)(StreamWithCTS*);
-    void (*commandHandler)(StreamWithCTS*, byte);
-    void (*localEventHandler)(StreamWithCTS*, byte);
-    void (*remoteEventHandler)(StreamWithCTS*, byte);
-    void (*dataHandler)(StreamWithCTS*, bool);
-    void (*receiveHandler)(StreamWithCTS*, int);
-    bool (*readyToReceiveHandler)(StreamWithCTS*, bool);
-    void (*sendHandler)(StreamWithCTS*, int);
+    //void (*resetHandler)(StreamFlowController*);
+    void (*commandHandler)(StreamFlowController*, byte);
+    void (*localEventHandler)(StreamFlowController*, byte);
+    void (*remoteEventHandler)(StreamFlowController*, byte);
+    void (*dataHandler)(StreamFlowController*, bool);
+    void (*receiveHandler)(StreamFlowController*, int);
+    bool (*readyToReceiveHandler)(StreamFlowController*, bool);
+    void (*sendHandler)(StreamFlowController*, int);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
@@ -100,16 +100,16 @@ class StreamWithCTS{
     
     int error = 0;
     
-    StreamWithCTS(unsigned int uartLocalBufferSize, unsigned int uartRemotelBufferSize, unsigned int receiveBufferSize = 0, unsigned int sendBufferSize = 0);
-    ~StreamWithCTS();
+    StreamFlowController(unsigned int uartLocalBufferSize, unsigned int uartRemotelBufferSize, unsigned int receiveBufferSize = 0, unsigned int sendBufferSize = 0);
+    ~StreamFlowController();
 
     void begin(Stream *stream);
-    void setCommandHandler(void (*handler)(StreamWithCTS*, byte)); //this stream, the command byte
-    void setEventHandlers(void (*handler1)(StreamWithCTS*, byte), void (*handler2)(StreamWithCTS*, byte));  //this stream, the event byte
-    void setDataHandler(void (*handler)(StreamWithCTS*, bool));
-    void setReceiveHandler(void (*handler)(StreamWithCTS*, int));
-    void setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*, bool));
-    void setSendHandler(void (*handler)(StreamWithCTS*, int));
+    void setCommandHandler(void (*handler)(StreamFlowController*, byte)); //this stream, the command byte
+    void setEventHandlers(void (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte));  //this stream, the event byte
+    void setDataHandler(void (*handler)(StreamFlowController*, bool));
+    void setReceiveHandler(void (*handler)(StreamFlowController*, int));
+    void setReadyToReceiveHandler(bool (*handler)(StreamFlowController*, bool));
+    void setSendHandler(void (*handler)(StreamFlowController*, int));
     void setCTSTimeout(int ms); //in millis
     void setMaxDatablockSize(int max);
     bool isReady();

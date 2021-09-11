@@ -1,9 +1,9 @@
-#include <ChetchStreamWithCTS.h>
+#include <ChetchStreamFlowController.h>
 
 namespace Chetch
 {
 
-	StreamWithCTS::StreamWithCTS(unsigned int uartLocalBufferSize, unsigned int uartRemoteBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize)
+	StreamFlowController::StreamFlowController(unsigned int uartLocalBufferSize, unsigned int uartRemoteBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize)
 	{
 
 		this->uartLocalBufferSize = uartLocalBufferSize;
@@ -15,14 +15,14 @@ namespace Chetch
 		cts = true;
 	}
 
-    StreamWithCTS::~StreamWithCTS()
+    StreamFlowController::~StreamFlowController()
 	{
 		if(receiveBuffer != NULL)delete receiveBuffer;
 		if(sendBuffer != NULL)delete sendBuffer;
     }
 
     
-    void StreamWithCTS::begin(Stream *stream)
+    void StreamFlowController::begin(Stream *stream)
 	{
 		this->stream = stream;
 		localReset = false;
@@ -31,44 +31,44 @@ namespace Chetch
 	}
 
 	
-    void StreamWithCTS::setCommandHandler(void (*handler)(StreamWithCTS*, byte))
+    void StreamFlowController::setCommandHandler(void (*handler)(StreamFlowController*, byte))
 	{
 		commandHandler = handler;
     }
 
-	void StreamWithCTS::setEventHandlers(void (*handler1)(StreamWithCTS*, byte), void (*handler2)(StreamWithCTS*, byte))
+	void StreamFlowController::setEventHandlers(void (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte))
 	{
 		localEventHandler = handler1;
 		remoteEventHandler = handler2;
     }
 
-    void StreamWithCTS::setReadyToReceiveHandler(bool (*handler)(StreamWithCTS*, bool))
+    void StreamFlowController::setReadyToReceiveHandler(bool (*handler)(StreamFlowController*, bool))
 	{
 		readyToReceiveHandler = handler;
     }
 
-    void StreamWithCTS::setDataHandler(void (*handler)(StreamWithCTS*, bool))
+    void StreamFlowController::setDataHandler(void (*handler)(StreamFlowController*, bool))
 	{
 		dataHandler = handler;
     }
 
-	void StreamWithCTS::setReceiveHandler(void (*handler)(StreamWithCTS*, int)){
+	void StreamFlowController::setReceiveHandler(void (*handler)(StreamFlowController*, int)){
 		receiveHandler = handler;
 	}
 
-	void StreamWithCTS::setSendHandler(void (*handler)(StreamWithCTS*, int)){
+	void StreamFlowController::setSendHandler(void (*handler)(StreamFlowController*, int)){
 		sendHandler = handler;
 	}
 
-	void StreamWithCTS::setCTSTimeout(int ms){
+	void StreamFlowController::setCTSTimeout(int ms){
 		ctsTimeout = ms;
 	}
 
-	void StreamWithCTS::setMaxDatablockSize(int max){
+	void StreamFlowController::setMaxDatablockSize(int max){
 		maxDatablockSize = max;
 	}
 
-	void StreamWithCTS::reset(bool sendCommandByte)
+	void StreamFlowController::reset(bool sendCommandByte)
 	{
 		while(stream->available())stream->read();
 		receiveBuffer->reset();
@@ -78,6 +78,8 @@ namespace Chetch
 		cts = true;
 		remoteRequestedCTS = false;
 		localRequestedCTS = false;
+		lastRemoteCTSRequest = 0;
+		lastCTSrequired = 0;
 		rslashed = false;
 		rcommand = false;
 		revent = false;
@@ -93,7 +95,7 @@ namespace Chetch
 		localReset = true;
     }    
 
-    byte StreamWithCTS::readFromStream(bool count)
+    byte StreamFlowController::readFromStream(bool count)
 	{
 		if(count){
 			bytesReceived++;
@@ -106,7 +108,7 @@ namespace Chetch
 		return b;
     }
 
-    void StreamWithCTS::writeToStream(byte b, bool count, bool flush)
+    void StreamFlowController::writeToStream(byte b, bool count, bool flush)
 	{
 		if(count){
 			bytesSent++;
@@ -121,22 +123,22 @@ namespace Chetch
 		}
     }
 
-    byte StreamWithCTS::peekAtStream()
+    byte StreamFlowController::peekAtStream()
 	{
 		return stream->peek();
     }
 
-    int StreamWithCTS::dataAvailable()
+    int StreamFlowController::dataAvailable()
 	{
 		return stream->available();
     }
 
-	bool StreamWithCTS::isReady(){
+	bool StreamFlowController::isReady(){
 		return localReset && remoteReset;
 	}
 
 
-    void StreamWithCTS::printVitals()
+    void StreamFlowController::printVitals()
 	{
 		/*Serial.print(" .... ");
 		Serial.print("CTS: ");
@@ -157,12 +159,12 @@ namespace Chetch
 	
     }
 
-    void StreamWithCTS::dumpLog()
+    void StreamFlowController::dumpLog()
 	{
 		
     }
 
-    void StreamWithCTS::receive()
+    void StreamFlowController::receive()
 	{
 		//As part of the loop (receive, process send) this will be called in situations where there is no data available.
 		//Given that sendCTS is dependent not only on bytes received but also potentially a user-defined method
@@ -309,7 +311,7 @@ namespace Chetch
 		} //end data available loop      
     }
 
-    void StreamWithCTS::process()
+    void StreamFlowController::process()
 	{
 		if(!isReady())return;
 
@@ -331,7 +333,7 @@ namespace Chetch
 		}
     }
 
-    void StreamWithCTS::send()
+    void StreamFlowController::send()
 	{
 		if(!isReady())return;
 
@@ -388,13 +390,13 @@ namespace Chetch
 		} //end sending loop
     }
 
-	void StreamWithCTS::loop(){
+	void StreamFlowController::loop(){
 		receive();
 		process();
 		send();
 	}
 
-	void StreamWithCTS::handleData(bool endOfData){
+	void StreamFlowController::handleData(bool endOfData){
 		if(dataHandler != NULL){
 			dataHandler(this, endOfData);
 		}
@@ -403,24 +405,24 @@ namespace Chetch
 		}
 	}
 
-    bool StreamWithCTS::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
+    bool StreamFlowController::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
 	{
 		if(bufferSize == 0)return false;
 		int limit = bufferSize - RESERVED_BUFFER_SIZE;
 		return byteCount == limit;
     }
 
-	bool StreamWithCTS::readyToReceive(bool request4cts){
+	bool StreamFlowController::readyToReceive(bool request4cts){
 		if(readyToReceiveHandler!= NULL){
 			return readyToReceiveHandler(this, request4cts);	
 		} else if(request4cts){ //if the remoe has requested a cts to be sent
-			return canReceive(StreamWithCTS::UART_LOCAL_BUFFER_SIZE);
+			return canReceive(StreamFlowController::UART_LOCAL_BUFFER_SIZE);
 		} else { //Normal flow control}
 			return bytesToRead() == 0;
 		}
 	}
 
-	bool StreamWithCTS::sendCTS(bool overrideFlowControl){
+	bool StreamFlowController::sendCTS(bool overrideFlowControl){
 		if(overrideFlowControl || (requiresCTS(bytesReceived, uartLocalBufferSize) && readyToReceive(false)))
 		{
 			writeToStream(CTS_BYTE, false, true);
@@ -433,31 +435,31 @@ namespace Chetch
 	}
 
 
-	void StreamWithCTS::sendCommand(Command c){
+	void StreamFlowController::sendCommand(Command c){
 		sendCommand((byte)c);
 	}
 
-	void StreamWithCTS::sendCommand(byte b){
+	void StreamFlowController::sendCommand(byte b){
 		writeToStream(COMMAND_BYTE, false);
 		writeToStream(b, false, true);
 	}
 
-	void StreamWithCTS::ping(){
+	void StreamFlowController::ping(){
 		sendCommand(Command::PING);
 	}
 
-	void StreamWithCTS::sendEvent(Event e){
+	void StreamFlowController::sendEvent(Event e){
 		sendEvent((byte)e);
 	}
 
-	void StreamWithCTS::sendEvent(byte b){
+	void StreamFlowController::sendEvent(byte b){
 		if(localEventHandler != NULL)localEventHandler(this, b);
 		
 		writeToStream(EVENT_BYTE, false);
 		writeToStream(b, false, true);
 	}
 
-    bool StreamWithCTS::isSystemByte(byte b){
+    bool StreamFlowController::isSystemByte(byte b){
 		switch(b){
 			case CTS_BYTE:
 			case SLASH_BYTE:
@@ -472,7 +474,7 @@ namespace Chetch
 		}
     }
 
-	int StreamWithCTS::getLimit(int limit){
+	int StreamFlowController::getLimit(int limit){
 		switch(limit){
 			case UART_LOCAL_BUFFER_SIZE:
 				return uartLocalBufferSize;
@@ -500,10 +502,10 @@ namespace Chetch
 		}
 	}
 
-	unsigned int StreamWithCTS::getBytesReceived(){ return bytesReceived; }
-    unsigned int StreamWithCTS::getBytesSent(){ return bytesSent; }
+	unsigned int StreamFlowController::getBytesReceived(){ return bytesReceived; }
+    unsigned int StreamFlowController::getBytesSent(){ return bytesSent; }
 
-    bool StreamWithCTS::canReceive(int byteCount){
+    bool StreamFlowController::canReceive(int byteCount){
 		if(byteCount == NO_LIMIT){
 			return  receiveBuffer->isEmpty();
 		} else {
@@ -511,7 +513,7 @@ namespace Chetch
 		}
     }
 
-    bool StreamWithCTS::canSend(int byteCount){
+    bool StreamFlowController::canSend(int byteCount){
 		if(byteCount == NO_LIMIT){
 			return  sendBuffer->isEmpty();
 		} else {
@@ -519,11 +521,11 @@ namespace Chetch
 		}
     }
 
-    byte StreamWithCTS::read(){
+    byte StreamFlowController::read(){
 		return receiveBuffer->read();
     }
 
-	int StreamWithCTS::bytesToRead(bool untilMarker){
+	int StreamFlowController::bytesToRead(bool untilMarker){
 		if(untilMarker){
 			return receiveBuffer->readToMarkerCount();
 		} else {
@@ -531,24 +533,24 @@ namespace Chetch
 		}
 	}
 
-    bool StreamWithCTS::write(byte b, bool addMarker)
+    bool StreamFlowController::write(byte b, bool addMarker)
 	{
 		bool retVal = sendBuffer->write(b);
 		if(retVal && addMarker)sendBuffer->setMarker();
 		return retVal;
     }
 
-	bool StreamWithCTS::write(int n, bool addMarker)
+	bool StreamFlowController::write(int n, bool addMarker)
 	{
 		return write<int>(n, addMarker);
 	}
 
-	bool StreamWithCTS::write(long n, bool addMarker)
+	bool StreamFlowController::write(long n, bool addMarker)
 	{
 		return write<long>(n, addMarker);
 	}
 
-    bool StreamWithCTS::write(byte *bytes, int size, bool addEndMarker)
+    bool StreamFlowController::write(byte *bytes, int size, bool addEndMarker)
 	{
 		for(int i = 0; i < size; i++)
 		{
@@ -560,11 +562,11 @@ namespace Chetch
 		return true;
     }
 
-	void StreamWithCTS::endWrite(){
+	void StreamFlowController::endWrite(){
 		sendBuffer->setMarker();
 	}
 
-    bool StreamWithCTS::isClearToSend()
+    bool StreamFlowController::isClearToSend()
 	{
 		return cts;
     }
