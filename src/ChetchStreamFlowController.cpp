@@ -36,7 +36,7 @@ namespace Chetch
 		commandHandler = handler;
     }
 
-	void StreamFlowController::setEventHandlers(void (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte))
+	void StreamFlowController::setEventHandlers(bool (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte))
 	{
 		localEventHandler = handler1;
 		remoteEventHandler = handler2;
@@ -453,10 +453,13 @@ namespace Chetch
 	}
 
 	void StreamFlowController::sendEvent(byte b){
-		if(localEventHandler != NULL)localEventHandler(this, b);
+		bool doSend = true;
+		if(localEventHandler != NULL)doSend = localEventHandler(this, b);
 		
-		writeToStream(EVENT_BYTE, false);
-		writeToStream(b, false, true);
+		if(doSend){
+			writeToStream(EVENT_BYTE, false);
+			writeToStream(b, false, true);
+		}
 	}
 
     bool StreamFlowController::isSystemByte(byte b){

@@ -12,12 +12,14 @@ namespace Chetch
             static StreamFlowController *xStream;
             static StreamFlowController *iStream;
             static int maxDataBlockSize;
+            static bool forwarding;
 
             static void init(StreamFlowController *internalStream, StreamFlowController *externalStream, int maxDataSize);
     
             static bool handleXReadyToReceive(StreamFlowController *stream, bool request4cts);
             static void handleXReceive(StreamFlowController *stream, int b2r);
             static void handleXCommand(StreamFlowController *stream, byte cmd);
+            static bool handleXLocalEvent(StreamFlowController *stream, byte evt);
   
             static bool handleIReadyToReceive(StreamFlowController *stream, bool request4cts);
             static void handleIReceive(StreamFlowController *stream, int b2r);

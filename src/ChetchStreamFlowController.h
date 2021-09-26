@@ -34,9 +34,8 @@ class StreamFlowController{
    
   protected:  
     //callbacks
-    //void (*resetHandler)(StreamFlowController*);
     void (*commandHandler)(StreamFlowController*, byte);
-    void (*localEventHandler)(StreamFlowController*, byte);
+    bool (*localEventHandler)(StreamFlowController*, byte);
     void (*remoteEventHandler)(StreamFlowController*, byte);
     void (*dataHandler)(StreamFlowController*, bool);
     void (*receiveHandler)(StreamFlowController*, int);
@@ -105,7 +104,7 @@ class StreamFlowController{
 
     void begin(Stream *stream);
     void setCommandHandler(void (*handler)(StreamFlowController*, byte)); //this stream, the command byte
-    void setEventHandlers(void (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte));  //this stream, the event byte
+    void setEventHandlers(bool (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte));  //this stream, the event byte
     void setDataHandler(void (*handler)(StreamFlowController*, bool));
     void setReceiveHandler(void (*handler)(StreamFlowController*, int));
     void setReadyToReceiveHandler(bool (*handler)(StreamFlowController*, bool));

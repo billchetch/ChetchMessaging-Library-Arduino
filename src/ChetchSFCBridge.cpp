@@ -5,6 +5,7 @@ namespace Chetch
     StreamFlowController* SFCBridge::iStream;
     StreamFlowController* SFCBridge::xStream;
     int SFCBridge::maxDataBlockSize;
+    bool SFCBridge::forwarding; //used to supress default handler behaviour (see)
     
     void SFCBridge::init(StreamFlowController *internalStream, StreamFlowController *externalStream, int maxDataSize){
         iStream = internalStream;
@@ -17,8 +18,10 @@ namespace Chetch
         xStream->setReadyToReceiveHandler(handleXReadyToReceive);
         xStream->setReceiveHandler(handleXReceive);
         xStream->setCommandHandler(handleXCommand);
+        xStream->setEventHandlers(handleXLocalEvent, NULL);
         
         maxDataBlockSize = maxDataSize;
+        forwarding = false;
     }
 
     //Internal stream
@@ -40,7 +43,18 @@ namespace Chetch
     }
 
     void SFCBridge::handleIRemoteEvent(StreamFlowController *stream, byte evt){
-      xStream->sendEvent(200 + evt);
+        switch(evt){
+            case (byte)StreamFlowController::Event::RESET: 
+                forwarding = true;
+                xStream->sendEvent(evt); //forward the event on;
+                forwarding = false;
+                break;
+
+            default:
+                xStream->sendEvent(200 + evt); //forward the event on with a bump
+                break;
+        }
+        
     }
 
     //External stream
@@ -68,9 +82,22 @@ namespace Chetch
           break;
 
         case (byte)StreamFlowController::Command::RESET:
-          iStream->sendCommand(cmd);
+          iStream->sendCommand(cmd); //forward the reset command
           break;
       }
+    }
+
+    bool SFCBridge::handleXLocalEvent(StreamFlowController *stream, byte evt){
+        switch(evt){
+            //cancel sending event back to remote. Instead we use handleXCommand to forward reset command to Internal stream remote.
+            //Once the internal stream remote has reset and sent event bak to internal stream local we catch it with handleIEvent and
+            //then forward it on to X remote.
+            case (byte)StreamFlowController::Event::RESET: 
+                return forwarding;
+
+            default:
+                return true;
+        }
     }
 
     void SFCBridge::beginIStream(Stream *stream){
