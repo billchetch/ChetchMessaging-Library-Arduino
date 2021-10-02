@@ -175,7 +175,6 @@ namespace Chetch
 			return;
 		}
 
-
 		//here we can already start receiving data
 		byte b;
 		bool isData = true;
@@ -282,30 +281,35 @@ namespace Chetch
 			} //end slashed test
 	
 			//If it's data then we add to the receive buffer
-			if(isData && isReady())
+			if(isData)
 			{
-				b = readFromStream();
-				if(receiveBuffer->isFull())
-				{
-					//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
-					//event firing too many times
-					sendEvent(Event::RECEIVE_BUFFER_FULL);
-					continueReceiving = false;
-				} 
-				else 
-				{
-					if(rslashed)rslashed = false;
-					receiveBuffer->write(b);
+				if(isReady()){ //both this and the remote are in sync with reset
+					b = readFromStream();
+					if(receiveBuffer->isFull())
+					{
+						//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
+						//event firing too many times
+						sendEvent(Event::RECEIVE_BUFFER_FULL);
+						continueReceiving = false;
+					} 
+					else 
+					{
+						if(rslashed)rslashed = false;
+						receiveBuffer->write(b);
 
-					if(maxDatablockSize > 0){
-						int n = receiveBuffer->lastSetMarkerCount();
-						if(n < 0)n = receiveBuffer->used();
-						if(n > maxDatablockSize){
-							//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
-							//event firing too many times
-							sendEvent(Event::MAX_DATABLOCK_SIZE_EXCEEDED);
-						}
-					}	
+						if(maxDatablockSize > 0){
+							int n = receiveBuffer->lastSetMarkerCount();
+							if(n < 0)n = receiveBuffer->used();
+							if(n > maxDatablockSize){
+								//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
+								//event firing too many times
+								sendEvent(Event::MAX_DATABLOCK_SIZE_EXCEEDED);
+							}
+						}	
+					}
+				} else {
+					//otherwise remove from buffer
+					readFromStream(false);
 				}
 			}		
 		} //end data available loop      
