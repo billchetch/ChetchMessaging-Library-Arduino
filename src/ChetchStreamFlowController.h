@@ -1,7 +1,7 @@
 #ifndef CHETCH_STREAM_FLOW_CONTROLLER_H
 #define CHETCH_STREAM_FLOW_CONTROLLER_H
 
-#include <Arduino.h>
+//#include <Arduino.h>
 #include "ChetchRingBuffer.h"
 
 
@@ -77,7 +77,7 @@ class StreamFlowController{
         DEBUG_OFF = 3,
         RESET_RECEIVE_BUFFER = 4,
         RESET_SEND_BUFFER = 5,
-        PING = 6,
+        PING_REMOTE = 6,
         REQUEST_STATUS = 100, 
         
     };

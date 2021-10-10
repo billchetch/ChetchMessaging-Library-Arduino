@@ -77,7 +77,7 @@ namespace Chetch
 
     void SFCBridge::handleXCommand(StreamFlowController *stream, byte cmd){
       switch(cmd){
-        case (byte)StreamFlowController::Command::PING:
+        case (byte)StreamFlowController::Command::PING_REMOTE:
           iStream->ping();
           break;
 

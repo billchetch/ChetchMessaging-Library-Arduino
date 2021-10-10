@@ -201,7 +201,7 @@ namespace Chetch
 						sendBuffer->reset();
 						break;
 
-					case (byte)Command::PING:
+					case (byte)Command::PING_REMOTE:
 						sendEvent(Event::PING_RECEIVED);
 						break;
 				}
@@ -272,7 +272,7 @@ namespace Chetch
 						if(!cts){ // we check so as to avoid unnecessary reseting of bytesSent
 							cts = true;
 							bytesSent = 0;
-							localRequestedCTS = false; //request has been grante
+							localRequestedCTS = false; //request has been granted
      						continueReceiving = false; //we exit the loop so as we can dispatch anything in the send buffer
 						}
 						isData = false;
@@ -393,8 +393,8 @@ namespace Chetch
 				}
 			}
 
+			//we write to the underlying stream
 			writeToStream(b);
-			
 		} //end sending loop
     }
 
@@ -415,7 +415,7 @@ namespace Chetch
 
     bool StreamFlowController::requiresCTS(unsigned int byteCount, unsigned int bufferSize)
 	{
-		if(bufferSize == 0)return false;
+		if(bufferSize <= 0)return false;
 		int limit = bufferSize - RESERVED_BUFFER_SIZE;
 		return byteCount == limit;
     }
@@ -453,7 +453,7 @@ namespace Chetch
 	}
 
 	void StreamFlowController::ping(){
-		sendCommand(Command::PING);
+		sendCommand(Command::PING_REMOTE);
 	}
 
 	void StreamFlowController::sendEvent(Event e){
