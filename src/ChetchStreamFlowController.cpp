@@ -30,6 +30,10 @@ namespace Chetch
 		reset(true); //send command for remote to reset
 	}
 
+	bool StreamFlowController::hasBegun(){
+		return stream != NULL && localReset == true;
+	}
+
 	void StreamFlowController::end(){
 		reset(false); 
 		remoteReset = false;

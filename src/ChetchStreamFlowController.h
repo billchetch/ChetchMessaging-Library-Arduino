@@ -103,6 +103,7 @@ class StreamFlowController{
     ~StreamFlowController();
 
     void begin(Stream *stream);
+    bool hasBegun();
     void end();
     void setCommandHandler(void (*handler)(StreamFlowController*, byte)); //this stream, the command byte
     void setEventHandlers(bool (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte));  //this stream, the event byte
