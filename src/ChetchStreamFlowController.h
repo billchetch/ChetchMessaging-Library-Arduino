@@ -19,12 +19,13 @@ class StreamFlowController{
     bool remoteReset = false;
     bool cts = true;
     int ctsTimeout = -1; //wait for cts timeout
-    bool remoteRequestedCTS = false;
+    bool receivedCTSTimeout = false;
     unsigned long lastRemoteCTSRequest = 0;
-    bool localRequestedCTS = false;
+    bool sentCTSTimeout = false;
     unsigned long lastCTSrequired = 0; //the last time cts flag set to false (i.e requires remoe to send a CTS byte)
-    unsigned int bytesSent = 0;
-    unsigned int bytesReceived = 0;
+    unsigned int bytesSentSinceCTS = 0;
+    unsigned long bytesSent = 0;
+    unsigned long bytesReceived = 0;
     int maxDatablockSize = NO_LIMIT;
     bool rslashed = false;
     bool rcommand = false;
@@ -37,15 +38,14 @@ class StreamFlowController{
     void (*commandHandler)(StreamFlowController*, byte);
     bool (*localEventHandler)(StreamFlowController*, byte);
     void (*remoteEventHandler)(StreamFlowController*, byte);
-    void (*dataHandler)(StreamFlowController*, bool);
     void (*receiveHandler)(StreamFlowController*, int);
-    bool (*readyToReceiveHandler)(StreamFlowController*, bool);
+    bool (*readyToReceiveHandler)(StreamFlowController*);
     void (*sendHandler)(StreamFlowController*, int);
 
 
     //these methods allow inheriting from this class and using an object other than one derived from Stream
-    virtual byte readFromStream(bool count = true);
-    virtual void writeToStream(byte b, bool count = true, bool flush = false);
+    virtual byte readFromStream();
+    virtual void writeToStream(byte b, bool flush = false);
     virtual byte peekAtStream();
     virtual int dataAvailable();  
     
@@ -99,7 +99,9 @@ class StreamFlowController{
     
     int error = 0;
     
-    StreamFlowController(unsigned int uartLocalBufferSize, unsigned int uartRemotelBufferSize, unsigned int receiveBufferSize = 0, unsigned int sendBufferSize = 0);
+    StreamFlowController(unsigned int uartLocalBufferSize, unsigned int uartRemotelBufferSize, unsigned int receiveBufferSize , unsigned int sendBufferSize);
+    StreamFlowController(unsigned int receiveBufferSize, unsigned int sendBufferSize);
+    
     ~StreamFlowController();
 
     void begin(Stream *stream);
@@ -107,23 +109,21 @@ class StreamFlowController{
     void end();
     void setCommandHandler(void (*handler)(StreamFlowController*, byte)); //this stream, the command byte
     void setEventHandlers(bool (*handler1)(StreamFlowController*, byte), void (*handler2)(StreamFlowController*, byte));  //this stream, the event byte
-    void setDataHandler(void (*handler)(StreamFlowController*, bool));
     void setReceiveHandler(void (*handler)(StreamFlowController*, int));
-    void setReadyToReceiveHandler(bool (*handler)(StreamFlowController*, bool));
+    void setReadyToReceiveHandler(bool (*handler)(StreamFlowController*));
     void setSendHandler(void (*handler)(StreamFlowController*, int));
     void setCTSTimeout(int ms); //in millis
     void setMaxDatablockSize(int max);
     bool isReady();
     void reset(bool sendCommandByte);
-    void receive();
+    int receive(); 
     void process();
     void send();
     void loop();
-    void handleData(bool endOfData);
-    bool readyToReceive(bool request4cts);
+    bool readyToReceive();
     bool canReceive(int byteCount = 1); //-ve value checks if receive buffer is empty or uart buffer size
     bool canSend(int byteCount = 1); //-ve value checks if send buffer is empty or uart buffer size
-    bool sendCTS(bool overrideFlowControl = false);
+    void sendCTS();
     void sendCommand(Command c);
     void sendCommand(byte b);
     void sendEvent(Event e);
@@ -149,8 +149,8 @@ class StreamFlowController{
     bool isSystemByte(byte b);
     bool isClearToSend();
     int getLimit(int limit);
-    unsigned int getBytesReceived();
-    unsigned int getBytesSent();
+    unsigned long getBytesReceived();
+    unsigned long getBytesSent();
     void printVitals();    
     void dumpLog();
 };
