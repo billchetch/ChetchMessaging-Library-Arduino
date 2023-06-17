@@ -19,13 +19,12 @@ class StreamFlowController{
     bool remoteReset = false;
     bool cts = true;
     int ctsTimeout = -1; //wait for cts timeout
-    bool receivedCTSTimeout = false;
-    unsigned long lastRemoteCTSRequest = 0;
     bool sentCTSTimeout = false;
     unsigned long lastCTSrequired = 0; //the last time cts flag set to false (i.e requires remoe to send a CTS byte)
     unsigned int bytesSentSinceCTS = 0;
     unsigned long bytesSent = 0;
-    unsigned long bytesReceived = 0;
+    unsigned long bytesReceived = 0; 
+    unsigned int bytesReceivedSinceCTS = 0;
     int maxDatablockSize = NO_LIMIT;
     bool rslashed = false;
     bool rcommand = false;

@@ -83,20 +83,17 @@ namespace Chetch
 	}
 
 	
-	int _bcount = 0;
 	void StreamFlowController::reset(bool sendCommandByte)
 	{
 		while(stream->available())stream->read();
 		receiveBuffer->reset();
 		sendBuffer->reset();
 		bytesReceived = 0;
-		_bcount = 0; ///remove this
+		bytesReceivedSinceCTS = 0;
 		bytesSent = 0;
 		bytesSentSinceCTS = 0;
 		cts = true;
-		receivedCTSTimeout = false;
 		sentCTSTimeout = false;
-		lastRemoteCTSRequest = 0;
 		lastCTSrequired = 0;
 		rslashed = false;
 		rcommand = false;
@@ -116,6 +113,7 @@ namespace Chetch
     byte StreamFlowController::readFromStream()
 	{
 		bytesReceived++;
+		if(uartLocalBufferSize > 0)bytesReceivedSinceCTS++;
 		byte b = stream->read();
 		return b;
     }
@@ -169,15 +167,22 @@ namespace Chetch
 		
     }
 
+	//returns number of bytes
     int StreamFlowController::receive()
 	{
 		//here we can already start receiving data
+		int bytesAvailable = dataAvailable(); //we take a value now as this can change independently (i.e works like an interrupt)
+		if(bytesAvailable == 0){
+			return 0;
+		}
+
+
 		byte b;
 		bool isData = true;
-		int bytes2read = min(receiveBuffer->remaining(), dataAvailable());
-		if(bytes2read > 0){ 
+		int bytes2read = max(1, min(bytesAvailable, receiveBuffer->remaining())); //we must read atleast one byte
+		/*if(bytes2read > 0){ 
 			Serial.print("Bytes on uart "); Serial.print(bytes2read); Serial.print(" remaining rb "); Serial.print(receiveBuffer->remaining()); Serial.println("");
-		}
+		}*/
 		int bytesRead = 0;
 		for(bytesRead = 0; bytesRead < bytes2read; bytesRead++)
 		{
@@ -217,13 +222,11 @@ namespace Chetch
 						break;
 
 					case (byte)Event::CTS_TIMEOUT:
-						receivedCTSTimeout = true;
-						lastRemoteCTSRequest = millis(); //for a timeout
+						//Serial.println("Received CTS timeout");
 						break;
 
 					case (byte)Event::CTS_REQUEST_TIMEOUT:
-                        sentCTSTimeout = false; //remote couldn't send a CTS byte so reset this flag so we can send a cts timeout again
-						break;
+                        break;
 				}
 				if(remoteEventHandler != NULL)remoteEventHandler(this, b);
 				revent = false;
@@ -270,7 +273,10 @@ namespace Chetch
 						cts = true;
 						bytesSentSinceCTS = 0;
 						sentCTSTimeout = false; //request has been granted
-     					return bytesRead + 1;
+						Serial.println("<----- Received CTS byte...");
+     					//return bytesRead + 1;
+						isData = false; 
+						break;
 
 					default:
 						isData = true;
@@ -282,17 +288,15 @@ namespace Chetch
 			if(isData)
 			{
 				if(isReady()){ //both this and the remote are in sync with reset
-					b = readFromStream();
 					if(receiveBuffer->isFull())
 					{
-						//TODO: we have to take action here (e.g. reset receive buffer) otherwise there is a risk of this 
-						//event firing too many times
-						Serial.println("Receive buffer is full");
 						sendEvent(Event::RECEIVE_BUFFER_FULL);
-						return bytesRead + 1;
+						return bytesRead;
 					} 
 					else 
 					{
+						b = readFromStream();
+					
 						if(rslashed)rslashed = false;
 						receiveBuffer->write(b);
 
@@ -320,36 +324,13 @@ namespace Chetch
 
     void StreamFlowController::process()
 	{
-		if(!isReady())return;
+		if(!isReady()){
+			return;
+		}
 
 		//remove data from reeive buffer
-		int b4h = receiveBuffer->used();
 		if(receiveHandler != NULL && bytesToRead() > 0){
-			Serial.print("---> Handling data...b2r ");
-			Serial.print(bytesToRead());
-			Serial.print(" rb used ");
-			Serial.println(receiveBuffer->used());
 			receiveHandler(this, bytesToRead());
-			Serial.print("----> Handled data...b2r ");
-			Serial.print(bytesToRead());
-			Serial.print(" rb used ");
-			Serial.println(receiveBuffer->used());
-		}
-		
-		
-		if(uartLocalBufferSize > 0 && b4h > receiveBuffer->used()){
-			if(readyToReceive()){
-				Serial.println("Sending CTS byte ...");
-				sendCTS();
-			} else {
-				Serial.print("Cannot send CTS...rb remaining ");
-				Serial.print(receiveBuffer->remaining());
-				Serial.print(" sb remaining ");
-				Serial.print(sendBuffer->remaining());
-				Serial.print(" b2r ");
-				Serial.println(bytesToRead());
-
-			}
 		}
 		
 
@@ -366,8 +347,16 @@ namespace Chetch
 		//check if timeout has been exceeded
 		if(!cts && ctsTimeout > 0 && !sentCTSTimeout){
 			if((millis() - lastCTSrequired > ctsTimeout)) {
-				sendEvent(Event::CTS_TIMEOUT);
+				Serial.print("Sent CTS timeout... rb / sb remaining / bytesToRead ");
+				Serial.print(receiveBuffer->remaining());
+				Serial.print(" / ");
+				Serial.print(sendBuffer->remaining());
+				Serial.print(" / ");
+				Serial.println(bytesToRead());
+				
 				sentCTSTimeout = true;
+				//sendEvent(Event::CTS_TIMEOUT);
+				
 				return;
 			}
 		}
@@ -417,15 +406,43 @@ namespace Chetch
 
 			//are we clear to send or do we need to halt until the remote has sent a CTS byte
 			if(requiresCTS(bytesSentSinceCTS, uartRemoteBufferSize)){
+				Serial.println("Waiting for CTS byte...");
 				cts = false;
 				lastCTSrequired = millis();
 			}
 		} //end sending loop
     }
 
+	
 	void StreamFlowController::loop(){
-		receive();
+		static bool localUartBufferChange = false;
+		static bool receiveBufferChange = false;
+
+		if(receive() > 0){
+			localUartBufferChange = true;
+			Serial.print("Bytes recv since CTS: ");
+			Serial.println(bytesReceivedSinceCTS);
+		}
+		int b4p = receiveBuffer->used();
 		process();
+		if(b4p > receiveBuffer->used()){
+			receiveBufferChange = true;
+		}
+	
+		if(((uartLocalBufferSize > 0 && requiresCTS(bytesReceivedSinceCTS, uartLocalBufferSize)))){
+			if(readyToReceive()){
+				Serial.print("---> Sent CTS with rb remaining ");
+				Serial.println(receiveBuffer->remaining());
+				sendCTS();
+				bytesReceivedSinceCTS = 0;
+				localUartBufferChange = false;
+				receiveBufferChange = false;
+			} else {
+				//Serial.print("!!!!Cannot send CTS as not ready to receive: rb remaining : ");
+				//Serial.println(receiveBuffer->remaining());
+			}
+		}
+
 		send();
 	}
 
@@ -434,7 +451,7 @@ namespace Chetch
 	{
 		if(bufferSize == 0)return false;
 		int limit = bufferSize - RESERVED_BUFFER_SIZE;
-		return byteCount == limit;
+		return byteCount >= limit;
     }
 
 
@@ -449,7 +466,6 @@ namespace Chetch
 
 	void StreamFlowController::sendCTS(){
 		writeToStream(CTS_BYTE, true);
-		receivedCTSTimeout = false; //close the request
 	}
 
 
