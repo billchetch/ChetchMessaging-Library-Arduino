@@ -103,9 +103,13 @@ namespace Chetch
 		error = 0;
 		
 		if(sendCommandByte){
+			Serial.print("Sending RESET command ");
+			printVitals();
 			remoteReset = false;
 			sendCommand(Command::RESET);
 		}
+		Serial.print("Sending RESET Event ");
+		printVitals();
 		sendEvent(Event::RESET);
 		localReset = true;
     }    
@@ -143,21 +147,10 @@ namespace Chetch
 
     void StreamFlowController::printVitals()
 	{
-		/*Serial.print(" .... ");
-		Serial.print("CTS: ");
-		Serial.print(cts);
-		Serial.print(", ");
-		Serial.print("BR: "); 
-		Serial.print(bytesReceived); 
-		Serial.print(", ");
-		Serial.print("RBR: ");
-		Serial.print(receiveBuffer->remaining());
-		Serial.print(", ");
-		Serial.print("BS: "); 
-		Serial.print(bytesSent); 
-		Serial.print(", ");
-		Serial.print("SBR: ");
-		Serial.print(sendBuffer->remaining());*/
+		Serial.print("bytes sent / received since CTS ");
+		Serial.print(bytesSentSinceCTS);
+		Serial.print(" / ");
+		Serial.print(bytesReceivedSinceCTS);
 		Serial.println("");
 	
     }
@@ -195,9 +188,14 @@ namespace Chetch
 				b = readFromStream(); //read the command
 				switch(b){
 					case (byte)Command::RESET:
+						Serial.print("Received RESET command ");
+						printVitals();
 						reset(false); //do NOT send command for remote to reset
+						bytesReceivedSinceCTS = 1;
+						bytesReceived = 1;
 						//Serial.println("Remote commanded local to reset");
 						break;
+
 					case (byte)Command::RESET_RECEIVE_BUFFER:
 						receiveBuffer->reset();
 						break;
@@ -218,6 +216,8 @@ namespace Chetch
 				b = readFromStream(); //read the event
 				switch(b){
 					case (byte)Event::RESET:
+						Serial.print("Received RESET Event ");
+						printVitals();
 						remoteReset = true;
 						break;
 
@@ -406,7 +406,8 @@ namespace Chetch
 
 			//are we clear to send or do we need to halt until the remote has sent a CTS byte
 			if(requiresCTS(bytesSentSinceCTS, uartRemoteBufferSize)){
-				Serial.println("Waiting for CTS byte...");
+				Serial.print("Waiting for CTS byte... ");
+				printVitals();
 				cts = false;
 				lastCTSrequired = millis();
 			}
@@ -420,7 +421,9 @@ namespace Chetch
 
 		if(receive() > 0){
 			localUartBufferChange = true;
-			Serial.print("Bytes recv since CTS: ");
+			Serial.print("Bytes sent / recv since CTS: ");
+			Serial.print(bytesSentSinceCTS);
+			Serial.print(" / ");
 			Serial.println(bytesReceivedSinceCTS);
 		}
 		int b4p = receiveBuffer->used();
