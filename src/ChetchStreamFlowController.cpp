@@ -5,7 +5,6 @@ namespace Chetch
 
 	StreamFlowController::StreamFlowController(unsigned int uartLocalBufferSize, unsigned int uartRemoteBufferSize, unsigned int receiveBufferSize, unsigned int sendBufferSize)
 	{
-
 		this->uartLocalBufferSize = uartLocalBufferSize;
 		this->uartRemoteBufferSize = uartRemoteBufferSize;
 
@@ -103,13 +102,13 @@ namespace Chetch
 		error = 0;
 		
 		if(sendCommandByte){
-			Serial.print("Sending RESET command ");
-			printVitals();
+			//Serial.print("Sending RESET command ");
+			//printVitals();
 			remoteReset = false;
 			sendCommand(Command::RESET);
 		}
-		Serial.print("Sending RESET Event ");
-		printVitals();
+		//Serial.print("Sending RESET Event ");
+		//printVitals();
 		sendEvent(Event::RESET);
 		localReset = true;
     }    
@@ -173,14 +172,9 @@ namespace Chetch
 		byte b;
 		bool isData = true;
 		int bytes2read = max(1, min(bytesAvailable, receiveBuffer->remaining())); //we must read atleast one byte
-		/*if(bytes2read > 0){ 
-			Serial.print("Bytes on uart "); Serial.print(bytes2read); Serial.print(" remaining rb "); Serial.print(receiveBuffer->remaining()); Serial.println("");
-		}*/
 		int bytesRead = 0;
 		for(bytesRead = 0; bytesRead < bytes2read; bytesRead++)
 		{
-			//Serial.print("-- Start of data available loop "); Serial.print(bytesReceived); Serial.println("");
-
 			b = peekAtStream(); //we peek in case this is a data byte but the receive buffer is full
 			
 			if(rcommand)
@@ -188,8 +182,8 @@ namespace Chetch
 				b = readFromStream(); //read the command
 				switch(b){
 					case (byte)Command::RESET:
-						Serial.print("Received RESET command ");
-						printVitals();
+						//Serial.print("Received RESET command ");
+						//printVitals();
 						reset(false); //do NOT send command for remote to reset
 						bytesReceivedSinceCTS = 1;
 						bytesReceived = 1;
@@ -216,8 +210,8 @@ namespace Chetch
 				b = readFromStream(); //read the event
 				switch(b){
 					case (byte)Event::RESET:
-						Serial.print("Received RESET Event ");
-						printVitals();
+						//Serial.print("Received RESET Event ");
+						//printVitals();
 						remoteReset = true;
 						break;
 
@@ -272,10 +266,9 @@ namespace Chetch
 						b = readFromStream(); //remove from uart buffer
 						cts = true;
 						bytesSentSinceCTS = 0;
-						sentCTSTimeout = false; //request has been granted
-						Serial.println("<----- Received CTS byte...");
-     					//return bytesRead + 1;
-						isData = false; 
+						sentCTSTimeout = false; 
+						//Serial.println("<----- Received CTS byte...");
+     					isData = false; 
 						break;
 
 					default:
@@ -347,14 +340,12 @@ namespace Chetch
 		//check if timeout has been exceeded
 		if(!cts && ctsTimeout > 0 && !sentCTSTimeout){
 			if((millis() - lastCTSrequired > ctsTimeout)) {
-				Serial.print("Sent CTS timeout... rb / sb remaining / bytesToRead ");
-				Serial.print(receiveBuffer->remaining());
-				Serial.print(" / ");
-				Serial.print(sendBuffer->remaining());
-				Serial.print(" / ");
-				Serial.println(bytesToRead());
+				//Serial.print("Sent CTS timeout... rb / sb remaining / bytesToRead ");
+				//printVitals();
 				
 				sentCTSTimeout = true;
+
+				//TODO: stuff bsed on an options setting .... e.g. just send anyways, send an event etc. etc.
 				//sendEvent(Event::CTS_TIMEOUT);
 				
 				return;
@@ -406,8 +397,8 @@ namespace Chetch
 
 			//are we clear to send or do we need to halt until the remote has sent a CTS byte
 			if(requiresCTS(bytesSentSinceCTS, uartRemoteBufferSize)){
-				Serial.print("Waiting for CTS byte... ");
-				printVitals();
+				//Serial.print("Waiting for CTS byte... ");
+				//printVitals();
 				cts = false;
 				lastCTSrequired = millis();
 			}
@@ -416,33 +407,19 @@ namespace Chetch
 
 	
 	void StreamFlowController::loop(){
-		static bool localUartBufferChange = false;
-		static bool receiveBufferChange = false;
-
-		if(receive() > 0){
-			localUartBufferChange = true;
-			Serial.print("Bytes sent / recv since CTS: ");
-			Serial.print(bytesSentSinceCTS);
-			Serial.print(" / ");
-			Serial.println(bytesReceivedSinceCTS);
-		}
-		int b4p = receiveBuffer->used();
+		receive();
+			
 		process();
-		if(b4p > receiveBuffer->used()){
-			receiveBufferChange = true;
-		}
 	
 		if(((uartLocalBufferSize > 0 && requiresCTS(bytesReceivedSinceCTS, uartLocalBufferSize)))){
 			if(readyToReceive()){
-				Serial.print("---> Sent CTS with rb remaining ");
-				Serial.println(receiveBuffer->remaining());
+				Serial.print("---> Sent CTS  ");
+				printVitals();
 				sendCTS();
 				bytesReceivedSinceCTS = 0;
-				localUartBufferChange = false;
-				receiveBufferChange = false;
 			} else {
 				//Serial.print("!!!!Cannot send CTS as not ready to receive: rb remaining : ");
-				//Serial.println(receiveBuffer->remaining());
+				//printVitals();
 			}
 		}
 
