@@ -413,8 +413,8 @@ namespace Chetch
 	
 		if(((uartLocalBufferSize > 0 && requiresCTS(bytesReceivedSinceCTS, uartLocalBufferSize)))){
 			if(readyToReceive()){
-				Serial.print("---> Sent CTS  ");
-				printVitals();
+				//Serial.print("---> Sent CTS  ");
+				//printVitals();
 				sendCTS();
 				bytesReceivedSinceCTS = 0;
 			} else {
