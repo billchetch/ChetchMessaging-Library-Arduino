@@ -103,7 +103,7 @@ class StreamFlowController{
     
     ~StreamFlowController();
 
-    void begin(Stream *stream);
+    void begin(Stream *stream, bool clearUartBuffer = false);
     bool hasBegun();
     void end();
     void setCommandHandler(void (*handler)(StreamFlowController*, byte)); //this stream, the command byte
@@ -114,7 +114,7 @@ class StreamFlowController{
     void setCTSTimeout(int ms); //in millis
     void setMaxDatablockSize(int max);
     bool isReady();
-    void reset(bool sendCommandByte);
+    void reset(bool sendCommandByte, bool sendEventByte, bool clearUartBuffer = false);
     int receive(); 
     void process();
     void send();

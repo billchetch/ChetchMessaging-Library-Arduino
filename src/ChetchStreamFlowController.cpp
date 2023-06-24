@@ -32,12 +32,12 @@ namespace Chetch
     }
 
     
-    void StreamFlowController::begin(Stream *stream)
+    void StreamFlowController::begin(Stream *stream, bool clearUartBuffer)
 	{
 		this->stream = stream;
 		localReset = false;
 		remoteReset = false;
-		reset(true); //send command for remote to reset
+		reset(false, false, clearUartBuffer); //send command for remote to reset
 	}
 
 	bool StreamFlowController::hasBegun(){
@@ -45,7 +45,7 @@ namespace Chetch
 	}
 
 	void StreamFlowController::end(){
-		reset(false); 
+		reset(false, false); 
 		remoteReset = false;
 	}
 	
@@ -82,9 +82,11 @@ namespace Chetch
 	}
 
 	
-	void StreamFlowController::reset(bool sendCommandByte)
+	void StreamFlowController::reset(bool sendCommandByte, bool sendEventByte, bool clearUartBuffer)
 	{
-		while(stream->available())stream->read();
+		if(clearUartBuffer){
+			while(dataAvailable())stream->read();
+		}
 		receiveBuffer->reset();
 		sendBuffer->reset();
 		bytesReceived = 0;
@@ -104,12 +106,13 @@ namespace Chetch
 		if(sendCommandByte){
 			//Serial.print("Sending RESET command ");
 			//printVitals();
-			remoteReset = false;
 			sendCommand(Command::RESET);
 		}
-		//Serial.print("Sending RESET Event ");
-		//printVitals();
-		sendEvent(Event::RESET);
+		if(sendEventByte){
+			//Serial.print("Sending RESET Event ");
+			//printVitals();
+			sendEvent(Event::RESET);
+		}
 		localReset = true;
     }    
 
@@ -182,11 +185,10 @@ namespace Chetch
 				b = readFromStream(); //read the command
 				switch(b){
 					case (byte)Command::RESET:
-						//Serial.print("Received RESET command ");
+						//Serial.print("Received RESET command calling reset(false, false) ");
 						//printVitals();
-						reset(false); //do NOT send command for remote to reset
-						bytesReceivedSinceCTS = 1;
-						bytesReceived = 1;
+						remoteReset = false; //wait for event to come
+						reset(false, true); //do NOT send command for remote to reset but do send event
 						//Serial.println("Remote commanded local to reset");
 						break;
 
@@ -207,12 +209,18 @@ namespace Chetch
 			}
 			else if(revent)
 			{
-				b = readFromStream(); //read the event
+				b = readFromStream(); //read the event (NOTE: received byte will be counted here))
 				switch(b){
 					case (byte)Event::RESET:
 						//Serial.print("Received RESET Event ");
 						//printVitals();
+						bool ready = isReady();
 						remoteReset = true;
+						if(!ready && isReady()){
+							//Serial.print("READY!!!!");
+							bytesSentSinceCTS = 0;
+                            bytesReceivedSinceCTS = 0;
+						}
 						break;
 
 					case (byte)Event::CTS_TIMEOUT:
@@ -408,7 +416,7 @@ namespace Chetch
 	
 	void StreamFlowController::loop(){
 		receive();
-			
+	
 		process();
 	
 		if(((uartLocalBufferSize > 0 && requiresCTS(bytesReceivedSinceCTS, uartLocalBufferSize)))){
