@@ -352,9 +352,7 @@ namespace Chetch
 				//printVitals();
 				
 				sentCTSTimeout = true;
-
-				//TODO: stuff bsed on an options setting .... e.g. just send anyways, send an event etc. etc.
-				//sendEvent(Event::CTS_TIMEOUT);
+				sendEvent(Event::CTS_TIMEOUT);
 				
 				return;
 			}
