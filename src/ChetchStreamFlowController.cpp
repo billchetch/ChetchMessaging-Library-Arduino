@@ -46,6 +46,7 @@ namespace Chetch
 
 	void StreamFlowController::end(){
 		reset(false, false); 
+		localReset = false;
 		remoteReset = false;
 	}
 	
