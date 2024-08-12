@@ -33,7 +33,7 @@ class StreamFlowController{
     bool smarked = false;
    
   protected:  
-    //callbacks
+    //cabllbacks
     void (*commandHandler)(StreamFlowController*, byte);
     bool (*localEventHandler)(StreamFlowController*, byte);
     void (*remoteEventHandler)(StreamFlowController*, byte);
@@ -54,7 +54,6 @@ class StreamFlowController{
     static const byte SLASH_BYTE = (byte)0x5c; //92
     static const byte PAD_BYTE = (byte)0x70; //112
     static const byte END_BYTE = (byte)0x64; //100
-    //static const byte RESET_BYTE = (byte)0x63; //99
     static const byte COMMAND_BYTE = (byte)0x63; //99
     static const byte EVENT_BYTE = (byte)0x73; //115
 
