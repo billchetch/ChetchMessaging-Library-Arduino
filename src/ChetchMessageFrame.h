@@ -70,10 +70,10 @@ class MessageFrame{
     };
 
     /*static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
-    static int bytesToInt(byte *bytes, int offset, int numberOfBytes);
     static void longToBytes(byte *bytes, long n, int offset, int padToLength);
     static void ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength);*/
     static void intToBytes(byte *bytes, int n, int offset, int padToLength);
+    static int bytesToInt(byte *bytes, int offset, int numberOfBytes);
    // static void floatToBytes(byte *bytes, float n, int offset);*/
 
 
@@ -120,7 +120,8 @@ class MessageFrame{
 
     void reset();
 
-    bool write(Stream *stream);
+    bool read(Stream *stream);
+    void write(Stream *stream);
 };
 
 } //end namespace

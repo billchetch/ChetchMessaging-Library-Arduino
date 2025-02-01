@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "ChetchUtils.h"
 #include "ChetchMessageFrame.h"
 
 namespace Chetch{
@@ -8,6 +7,14 @@ namespace Chetch{
       for(int i = 0; i < padToLength; i++){
         bytes[offset + i] = (byte)(n >> 8*i);
       }
+    }
+
+    int MessageFrame::bytesToInt(byte *bytes, int offset, int numberOfBytes){
+      int retVal = 0;
+        for(int i = 0; i < numberOfBytes; i++){
+            ((byte *)&retVal)[i] = bytes[i + offset];
+        }
+        return retVal;
     }
 
     bool MessageFrame::isValidSchema(byte b){
@@ -112,7 +119,7 @@ namespace Chetch{
         encoding = (MessageFrame::MessageEncoding)header[dimensions->getEncodingIndex()];
 
         //specify payload size
-        dimensions->payload = Utils::bytesTo<int>(&header[dimensions->getPayloadSizeIndex()], dimensions->payloadSize, true);
+        dimensions->payload = bytesToInt(header, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
 
         //specify checksum index
         if(dimensions->checksum > 0){
@@ -201,4 +208,20 @@ namespace Chetch{
       dimensions->payload = 0;
     }
 
+    void MessageFrame::write(Stream* stream){
+      byte* bytes = getBytes();
+      for(int i = 0; i < getSize(); i++){
+        //stream->print(bytes[i]);
+        stream->write(bytes[i]);
+      }
+      //stream->print(getSize());
+    }
+
+    bool MessageFrame::read(Stream* stream){
+      while(stream->available()){
+        byte b = stream->read();
+        if(add(b))break;
+      }
+      return complete;
+    }
 } //end namespace
