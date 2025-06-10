@@ -103,10 +103,6 @@ class MessageFrame{
     MessageEncoding getEncoding();
     void setPayload(byte *payload, int payloadSize);
     void add2payload(byte val, int index);
-    /*void add2payload(long val, int index);
-    void add2payload(unsigned long val, int index);
-    void add2payload(int val, int index);
-    void add2payload(float val, int index);*/
     byte *getBytes(bool addChecksum = true);
     bool add(byte b);
     bool add(byte *b, int byteCount);

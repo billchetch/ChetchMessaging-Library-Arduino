@@ -41,10 +41,10 @@ namespace Chetch{
     MessageFrame::MessageFrame(FrameSchema schema, int maxPayload){
       this->schema = schema;
       dimensions = new Dimensions(schema);
-
+      
       this->maxPayload = maxPayload;
       bytes = new byte[dimensions->getFrameSize() + this->maxPayload];
-
+      
       header = &bytes[0];
       payload = &bytes[dimensions->getPayloadIndex()];
 
