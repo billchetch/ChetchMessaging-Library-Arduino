@@ -38,10 +38,12 @@ namespace Chetch{
 
     }
 
-    MessageFrame::MessageFrame(FrameSchema schema, int maxPayload){
+    MessageFrame::MessageFrame(FrameSchema schema, MessageEncoding encoding, int maxPayload){
       this->schema = schema;
       dimensions = new Dimensions(schema);
       
+      this->encoding = encoding;
+
       this->maxPayload = maxPayload;
       bytes = new byte[dimensions->getFrameSize() + this->maxPayload];
       
@@ -49,17 +51,13 @@ namespace Chetch{
       payload = &bytes[dimensions->getPayloadIndex()];
 
       header[0] = (byte)schema;
+      header[1] = (byte)encoding;
     }
 
     MessageFrame::~MessageFrame(){
       reset();
       if(dimensions != NULL)delete dimensions;
       if(bytes != NULL)delete[] bytes;
-    }
-
-    void MessageFrame::setEncoding(MessageEncoding encoding){
-      this->encoding = encoding;
-      header[1] = (byte)encoding;
     }
 
     MessageFrame::MessageEncoding MessageFrame::getEncoding(){
@@ -69,7 +67,7 @@ namespace Chetch{
     void MessageFrame::updatePayload(int payloadSize){
 	    if(payloadSize > dimensions->payload){
 	        dimensions->payload = payloadSize;
-      	    intToBytes(bytes, dimensions->payload, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
+      	  intToBytes(bytes, dimensions->payload, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
 	    }
     }
 
@@ -113,11 +111,13 @@ namespace Chetch{
           complete = true;
           return true;
         }
-
+      } else if(addPosition == dimensions->getEncodingIndex()){
+        if(b != (byte)encoding){
+          error = MessageFrame::FrameError::NON_VALID_ENCODING;
+          complete = true;
+          return true;
+        }
       } else if(addPosition == dimensions->getPayloadIndex()){
-        //here we have the header so make some assignments
-        encoding = (MessageFrame::MessageEncoding)header[dimensions->getEncodingIndex()];
-
         //specify payload size
         dimensions->payload = bytesToInt(header, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
 

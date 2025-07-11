@@ -18,7 +18,7 @@ class MessageFrame{
         XML,
         QUERY_STRING,
         POSITIONAL,
-        BYTES_ARRAY,
+        BYTES_ARRAY = 19,
         JSON
       };
 
@@ -96,10 +96,9 @@ class MessageFrame{
     FrameError error = FrameError::NO_ERROR;
 
     MessageFrame();
-    MessageFrame(FrameSchema schema, int maxPayload);
+    MessageFrame(FrameSchema schema, MessageEncoding encoding, int maxPayload);
     ~MessageFrame();
 
-    void setEncoding(MessageEncoding encoding);
     MessageEncoding getEncoding();
     void setPayload(byte *payload, int payloadSize);
     void add2payload(byte val, int index);
