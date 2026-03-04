@@ -6,16 +6,12 @@
 namespace Chetch{
 
 class RingBuffer{
-
     public:
-    
         struct Marker{
             int position = -1; //a negative position indicates non-use
             Marker *nextMarker = NULL;
         };
 
-    private:
-    
     public:
         byte *buffer;
         int size;
@@ -28,6 +24,7 @@ class RingBuffer{
         Marker *upcomingMarker = NULL;
         int markerCount = 0;
     
+        //Constructors
         RingBuffer();
         RingBuffer(int size);
         RingBuffer(byte *buffer, int size);

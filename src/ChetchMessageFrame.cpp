@@ -96,6 +96,9 @@ namespace Chetch{
           case SMALL_SIMPLE_CHECKSUM:
             bytes[dimensions->getChecksumIndex()] = simpleChecksum(bytes, 0, dimensions->getChecksumIndex());;
             break;
+
+          default:
+            break;
         }
       }
       return bytes;
@@ -186,8 +189,13 @@ namespace Chetch{
       } else {
         switch(schema){
           case SMALL_SIMPLE_CHECKSUM:
+          {
             byte csum = simpleChecksum(bytes, 0, dimensions->getChecksumIndex());
             if(checksum[0] != csum)error = FrameError::CHECKSUM_FAILED;
+            break;
+          }
+
+          default:
             break;
         }
       }
