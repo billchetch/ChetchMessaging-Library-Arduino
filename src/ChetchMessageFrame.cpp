@@ -218,11 +218,13 @@ namespace Chetch{
 
     void MessageFrame::write(Stream* stream){
       byte* bytes = getBytes();
+      //Serial.print("=> ");
       for(int i = 0; i < getSize(); i++){
-        //stream->print(bytes[i]);
+        //Serial.print(bytes[i]);
+        //Serial.print(",");
         stream->write(bytes[i]);
       }
-      //stream->print(getSize());
+      //Serial.println("");
     }
 
     bool MessageFrame::read(Stream* stream){
