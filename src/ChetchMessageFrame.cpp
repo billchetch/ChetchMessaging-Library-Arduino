@@ -65,15 +65,19 @@ namespace Chetch{
     }
 
     void MessageFrame::updatePayload(int payloadSize){
-	    if(payloadSize > dimensions->payload){
+	    if(payloadSize != dimensions->payload){
 	        dimensions->payload = payloadSize;
       	  intToBytes(bytes, dimensions->payload, dimensions->getPayloadSizeIndex(), dimensions->payloadSize);
 	    }
     }
 
-    void MessageFrame::setPayload(byte *payload, int payloadSize){
+    bool MessageFrame::setPayload(byte *payload, int payloadSize){
       if(dimensions == NULL || bytes == NULL){
-        return;
+        return false;
+      }
+
+      if(payloadSize > this->maxPayload){
+        return false;
       }
 
       updatePayload(payloadSize);
@@ -81,6 +85,8 @@ namespace Chetch{
       for(int i = 0; i < payloadSize; i++){
         this->payload[i] = payload[i];
       }
+
+      return true;
     }
 
     void MessageFrame::add2payload(byte val, int index){
@@ -216,13 +222,25 @@ namespace Chetch{
       dimensions->payload = 0;
     }
 
-    void MessageFrame::write(Stream* stream){
+    void MessageFrame::write(Stream* stream, byte padHead, byte padTail){
       byte* bytes = getBytes();
       //Serial.print("=> ");
+      if(padHead > 0){
+        for(int i = 0; i < padHead; i++){
+          stream->write(PADDING_BYTE);
+        }
+      }
+
       for(int i = 0; i < getSize(); i++){
         //Serial.print(bytes[i]);
         //Serial.print(",");
         stream->write(bytes[i]);
+      }
+
+      if(padTail > 0){
+        for(int i = 0; i < padTail; i++){
+            stream->write(PADDING_BYTE);
+        }
       }
       //Serial.println("");
     }

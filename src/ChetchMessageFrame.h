@@ -69,6 +69,8 @@ class MessageFrame{
         int getFrameSize(){ return frameSize; }
     };
 
+    const byte PADDING_BYTE = 0;
+
     /*static long bytesToLong(byte *bytes, int offset, int numberOfBytes);
     static void longToBytes(byte *bytes, long n, int offset, int padToLength);
     static void ulongToBytes(byte *bytes, unsigned long n, int offset, int padToLength);*/
@@ -100,7 +102,7 @@ class MessageFrame{
     ~MessageFrame();
 
     MessageEncoding getEncoding();
-    void setPayload(byte *payload, int payloadSize);
+    bool setPayload(byte *payload, int payloadSize);
     void add2payload(byte val, int index);
     byte *getBytes(bool addChecksum = true);
     bool add(byte b);
@@ -116,7 +118,7 @@ class MessageFrame{
     void reset();
 
     bool read(Stream *stream);
-    void write(Stream *stream);
+    void write(Stream *stream, byte padHead = 0, byte padTail = 0);
 };
 
 } //end namespace
